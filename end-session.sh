@@ -1,26 +1,25 @@
 #!/bin/bash
-# AOS Session End - Finalize provenance tracking
+# AOS Session End - Finalize OpenTelemetry-based provenance tracking
 
-SESSION_ID="${1:-latest}"
-TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+TOTAL_COST="$1"
 
-echo "🏁 Ending AOS tracking session: $SESSION_ID"
+echo "🏁 Ending AOS tracking session"
 echo ""
 
-# Final context snapshot
-~/aos-telemetry/hooks/pre-turn.sh
-
-echo ""
-echo "📊 Session Summary:"
-~/aos-telemetry/query-context.sh summary
-
-echo ""
-echo "🔧 Tool Usage:"
-if [[ -f ~/aos-telemetry/tool-calls.jsonl ]]; then
-    ~/aos-telemetry/query-provenance.sh tools-by-cost
+# End turn with OpenTelemetry
+if [ -n "$TOTAL_COST" ]; then
+    node ~/aos-telemetry/cli.js end-turn --cost "$TOTAL_COST"
 else
-    echo "  No tool calls logged yet"
+    node ~/aos-telemetry/cli.js end-turn
 fi
 
 echo ""
-echo "Session complete: $TIMESTAMP"
+echo "📊 Session Summary:"
+echo ""
+
+# Query recent traces
+node ~/aos-telemetry/cli.js query traces --limit 1
+
+echo ""
+echo "Query more traces: ~/aos-telemetry/query-traces.sh [limit]"
+echo "Session complete: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
