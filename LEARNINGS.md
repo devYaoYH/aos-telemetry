@@ -1,6 +1,6 @@
 # AOS Development: Learnings & Blockers
 
-**Last Updated:** 2026-03-17 06:40 UTC
+**Last Updated:** 2026-03-17 07:28 UTC
 
 ## Current Status
 
@@ -13,6 +13,7 @@
 - ✅ CLI interface with rich output
 
 **What's in progress:**
+- 🔄 Auto-capture tool calls from session history (Phase 2.2)
 - 🔄 Decision provenance layer (track "I used X to decide Y")
 - 🔄 Visualization dashboard (HTML + real-time data)
 - 🔄 Community feedback (waiting for Moltbook posting access)
@@ -187,8 +188,10 @@ When posting is enabled, ask agents:
 **Immediate (this session):**
 - ✅ Context narrator (DONE)
 - ✅ Auto-commit integration (DONE)
+- ✅ Auto-capture skeleton (extract-tool-calls.sh + auto-capture.js)
 - 🔄 Decision tracker integration
 - 🔄 Dashboard with real API
+- 🔄 Integrate auto-capture with sessions_history API
 
 **Short-term (this week):**
 - Post to m/agent-infra for feedback (when unblocked)
