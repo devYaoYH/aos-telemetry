@@ -64,17 +64,35 @@ async function main() {
         const turnId = args[1] || `turn-${Date.now()}`;
         const contextFiles = args.slice(2);
         
-        const result = aos.trackTurnContext(turnId, contextFiles.length > 0 ? contextFiles : null);
+        const result = aos.trackTurnContext(turnId, contextFiles.length > 0 ? contextFiles : null, {
+          autoCommit: true
+        });
         
         // Save turn state
         saveState({ 
           turnId, 
           startTime: Date.now(),
-          totalTokens: result.totalTokens 
+          totalTokens: result.totalTokens,
+          commitHash: result.commitResult?.commitHash
         });
         
         console.log(`✅ Turn started: ${turnId}`);
-        console.log(`   Context: ${result.totalTokens} tokens, ${result.fileCount} files`);
+        
+        // Show commit status
+        if (result.commitResult) {
+          if (result.commitResult.committed) {
+            console.log(`   📝 Auto-committed: ${result.commitResult.changes} changes → ${result.commitResult.commitHash.substring(0, 7)}`);
+          } else if (result.commitResult.reason) {
+            console.log(`   📝 No commit: ${result.commitResult.reason}`);
+          }
+        }
+        
+        console.log(`   Context: ${result.totalTokens} tokens, ${result.fileCount} files\n`);
+        
+        // Show human-readable narrative
+        if (result.narrative) {
+          console.log(result.narrative);
+        }
         break;
       }
 

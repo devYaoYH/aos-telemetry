@@ -5,6 +5,8 @@
 
 const { AOSTracer } = require('./tracer');
 const { ContextTracker } = require('./context-tracker');
+const { ContextNarrator } = require('./context-narrator');
+const { AutoCommit } = require('./auto-commit');
 const fs = require('fs');
 const path = require('path');
 
@@ -36,13 +38,68 @@ class AOS {
 
     this.tracer = this.aosTracer.initialize();
     this.contextTracker = new ContextTracker(this.tracer, this.options.workspaceDir);
+    this.narrator = new ContextNarrator(this.options.workspaceDir);
+    this.autoCommit = new AutoCommit(this.options.workspaceDir);
   }
 
   /**
    * Track context composition for a turn (creates and auto-closes span)
    */
-  trackTurnContext(turnId, contextFiles = null) {
-    return this.contextTracker.trackTurn(turnId, contextFiles);
+  trackTurnContext(turnId, contextFiles = null, options = {}) {
+    // Auto-commit workspace before tracking (if enabled)
+    let commitResult = null;
+    if (options.autoCommit !== false) {
+      commitResult = this.autoCommit.commitBeforeTurn(turnId);
+    }
+    
+    const result = this.contextTracker.trackTurn(turnId, contextFiles);
+    
+    // Generate human-readable narrative
+    const contextComposition = this._buildContextComposition(contextFiles);
+    const narrative = this.narrator.narrateContext(contextComposition);
+    
+    return {
+      ...result,
+      narrative,
+      contextComposition,
+      commitResult
+    };
+  }
+
+  /**
+   * Build context composition object for narrator
+   */
+  _buildContextComposition(contextFiles = null) {
+    if (!contextFiles) {
+      contextFiles = [
+        'MEMORY.md',
+        'SOUL.md',
+        'AGENTS.md',
+        'TOOLS.md',
+        'HEARTBEAT.md',
+        'USER.md',
+        'IDENTITY.md',
+        `memory/${new Date().toISOString().split('T')[0]}.md`
+      ];
+    }
+
+    const composition = {
+      total_tokens: 0,
+      total_lines: 0,
+      file_count: contextFiles.length
+    };
+
+    contextFiles.forEach(file => {
+      const tokens = this.contextTracker.estimateTokens(file);
+      const lines = this.contextTracker.countLines(file);
+      const gitHash = this.contextTracker.getGitHash(file);
+
+      composition[file] = { tokens, lines, git_hash: gitHash };
+      composition.total_tokens += tokens;
+      composition.total_lines += lines;
+    });
+
+    return composition;
   }
 
   /**
