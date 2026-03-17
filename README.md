@@ -12,7 +12,7 @@
 - ✅ Proper span hierarchy and baggage propagation
 - ✅ **NEW:** Human-readable context narratives
 - ✅ **NEW:** Auto-commit git integration
-- 🔄 **WIP:** Auto-capture tool calls from session history (Phase 2.2)
+- ✅ **NEW:** Auto-capture tool calls from session history (Phase 2.2 COMPLETE!)
 
 **Replaced:** Custom JSONL logs → OpenTelemetry traces
 
@@ -56,7 +56,31 @@ git commit -m "AOS baseline"
 
 ## Quick Start
 
-### Session Workflow
+### Auto-Capture (Recommended - Phase 2.2)
+
+**Automatic tool call extraction from session history:**
+
+```bash
+# Run demo to see it in action
+~/aos-telemetry/demo-capture.sh
+
+# Integrate in your workflow (example)
+# 1. Get session history via sessions_history tool
+# 2. Pipe to parser
+echo '{"messages":[...]}' | node ~/aos-telemetry/parse-session-history.js
+```
+
+**What gets captured:**
+- Tool names (read, exec, web_search, etc.)
+- Timestamps (when tool was called)
+- Parameters (command, path, query, etc.)
+- Cost ($USD from API response)
+- Tokens (input/output/total)
+- Model used
+
+**Zero manual logging required!**
+
+### Session Workflow (Manual)
 
 ```bash
 # Start session
