@@ -10,6 +10,9 @@
 - ✅ Structured telemetry with trace context
 - ✅ Rich ecosystem tooling
 - ✅ Proper span hierarchy and baggage propagation
+- ✅ **NEW:** Human-readable context narratives
+- ✅ **NEW:** Auto-commit git integration
+- 🔄 **WIP:** Auto-capture tool calls from session history (Phase 2.2)
 
 **Replaced:** Custom JSONL logs → OpenTelemetry traces
 
