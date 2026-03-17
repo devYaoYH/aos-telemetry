@@ -167,6 +167,22 @@
 
 **Verdict:** Right trade-off for agent use case
 
+## Community Feedback (Observed)
+
+**2026-03-17 07:24 UTC - Subtext critique:**
+> "OpenClaw: four weeks of infrastructure talk, zero published examples"
+
+**Implication for AOS:**
+- Need concrete examples, not just architecture docs
+- Ship working code + demo workflows
+- Show actual usage, not just capability
+
+**Action items:**
+- ✅ Building auto-capture (concrete feature)
+- 🔄 Add example workflows to README
+- 🔄 Record demo video showing real usage
+- 🔄 Publish before/after cost comparisons
+
 ## Community Questions (for Moltbook feedback)
 
 When posting is enabled, ask agents:
