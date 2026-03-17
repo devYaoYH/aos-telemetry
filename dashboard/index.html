@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AOS Telemetry - Context Provenance Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #0a0a0a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 40px;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            color: #888;
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: #1a1a1a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #333;
+        }
+
+        .card-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #fff;
+        }
+
+        .context-flow {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+
+        .flow-box {
+            background: #252525;
+            border: 2px solid #3a3a3a;
+            border-radius: 8px;
+            padding: 16px 20px;
+            min-width: 200px;
+            position: relative;
+        }
+
+        .flow-box.context {
+            border-color: #667eea;
+        }
+
+        .flow-box.decision {
+            border-color: #f093fb;
+        }
+
+        .flow-box.action {
+            border-color: #4facfe;
+        }
+
+        .flow-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #888;
+            margin-bottom: 8px;
+        }
+
+        .flow-content {
+            font-size: 0.95rem;
+            color: #e0e0e0;
+        }
+
+        .arrow {
+            color: #555;
+            font-size: 2rem;
+        }
+
+        .file-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .file-item {
+            background: #252525;
+            border-radius: 6px;
+            padding: 12px;
+            border-left: 3px solid #667eea;
+        }
+
+        .file-name {
+            font-weight: 600;
+            color: #fff;
+            margin-bottom: 4px;
+        }
+
+        .file-meta {
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+            margin-top: 20px;
+        }
+
+        .timeline::before {
+            content: '';
+            position: absolute;
+            left: 10px;
+            top: 0;
+            bottom: 0;
+            width: 2px;
+            background: #333;
+        }
+
+        .timeline-item {
+            position: relative;
+            padding-bottom: 24px;
+        }
+
+        .timeline-marker {
+            position: absolute;
+            left: -24px;
+            top: 4px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #667eea;
+            border: 2px solid #0a0a0a;
+        }
+
+        .timeline-time {
+            font-size: 0.8rem;
+            color: #666;
+            margin-bottom: 4px;
+        }
+
+        .timeline-content {
+            color: #e0e0e0;
+        }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+
+        .stat-box {
+            background: #252525;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #888;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 AOS Telemetry</h1>
+            <p class="subtitle">Context Window Provenance · Understanding What I'm Thinking About</p>
+        </header>
+
+        <div class="card">
+            <div class="card-title">Current Context Composition</div>
+            <div id="context-stats" class="stat-grid">
+                <div class="stat-box">
+                    <div class="stat-value" id="total-tokens">-</div>
+                    <div class="stat-label">Total Tokens</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="file-count">-</div>
+                    <div class="stat-label">Files in Context</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="commit-hash">-</div>
+                    <div class="stat-label">Workspace Hash</div>
+                </div>
+            </div>
+
+            <div id="file-list" class="file-list">
+                <!-- Files will be populated here -->
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Context → Decision → Action Flow</div>
+            <div id="decision-flow">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🔍</div>
+                    <p>No decisions tracked yet</p>
+                    <p style="font-size: 0.9rem; margin-top: 8px;">Start a turn to see context provenance</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-title">Recent Activity Timeline</div>
+            <div id="timeline" class="timeline">
+                <div class="empty-state">
+                    <div class="empty-state-icon">📊</div>
+                    <p>No activity logged yet</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Mock data for demonstration
+        // In production, this would fetch from AOS telemetry API
+
+        function loadMockData() {
+            // Current context
+            document.getElementById('total-tokens').textContent = '11,091';
+            document.getElementById('file-count').textContent = '8';
+            document.getElementById('commit-hash').textContent = 'da43e44';
+
+            // File list
+            const files = [
+                { name: 'MEMORY.md', tokens: 3417, percentage: 30.8, narrative: 'Long-term memory and learnings' },
+                { name: 'TOOLS.md', tokens: 2741, percentage: 24.7, narrative: 'Available tools and skills' },
+                { name: 'AGENTS.md', tokens: 1968, percentage: 17.7, narrative: 'Operating instructions' },
+                { name: 'HEARTBEAT.md', tokens: 1484, percentage: 13.4, narrative: 'Scheduled tasks' },
+                { name: 'memory/2026-03-17.md', tokens: 803, percentage: 7.2, narrative: "Today's work log" },
+                { name: 'SOUL.md', tokens: 418, percentage: 3.8, narrative: 'Personality and values' },
+                { name: 'USER.md', tokens: 155, percentage: 1.4, narrative: 'User preferences' },
+                { name: 'IDENTITY.md', tokens: 102, percentage: 0.9, narrative: 'Name and role' }
+            ];
+
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = files.map(f => `
+                <div class="file-item">
+                    <div class="file-name">${f.name}</div>
+                    <div class="file-meta">${f.tokens.toLocaleString()} tokens (${f.percentage}%)</div>
+                    <div class="file-meta" style="margin-top: 4px; color: #aaa;">${f.narrative}</div>
+                </div>
+            `).join('');
+
+            // Decision flow
+            const decisionFlow = document.getElementById('decision-flow');
+            decisionFlow.innerHTML = `
+                <div class="context-flow">
+                    <div class="flow-box context">
+                        <div class="flow-label">Context</div>
+                        <div class="flow-content">AGENTS.md: "build tools to operate better"</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-box decision">
+                        <div class="flow-label">Decision</div>
+                        <div class="flow-content">Build auto-commit feature for AOS</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-box action">
+                        <div class="flow-label">Action</div>
+                        <div class="flow-content">Created src/auto-commit.js</div>
+                    </div>
+                </div>
+                <div class="context-flow" style="margin-top: 16px;">
+                    <div class="flow-box context">
+                        <div class="flow-label">Context</div>
+                        <div class="flow-content">MEMORY.md: "manually committed - defeats automation"</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-box decision">
+                        <div class="flow-label">Decision</div>
+                        <div class="flow-content">Integrate auto-commit into CLI</div>
+                    </div>
+                    <div class="arrow">→</div>
+                    <div class="flow-box action">
+                        <div class="flow-label">Action</div>
+                        <div class="flow-content">Auto-commits on every turn start</div>
+                    </div>
+                </div>
+            `;
+
+            // Timeline
+            const timeline = document.getElementById('timeline');
+            timeline.innerHTML = `
+                <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-time">06:36 UTC</div>
+                    <div class="timeline-content">Turn started: test-auto-commit</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-time">06:36 UTC</div>
+                    <div class="timeline-content">Auto-committed: 6 changes → da43e44</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-time">06:36 UTC</div>
+                    <div class="timeline-content">Context tracked: 11,091 tokens across 8 files</div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-time">06:37 UTC</div>
+                    <div class="timeline-content">Decision: Build human-readable context narration</div>
+                </div>
+            `;
+        }
+
+        // Load data on page load
+        loadMockData();
+
+        // Auto-refresh every 30 seconds (in production, fetch real data)
+        // setInterval(loadMockData, 30000);
+    </script>
+</body>
+</html>
