@@ -288,7 +288,20 @@
         // Use relative URLs so it works both locally and remotely
         const API_BASE = window.location.origin;
 
-        function analyzeInsights(timeline, tools) {
+        async function analyzeInsights(timeline, tools) {
+            // Use server-side insights API for centralized logic
+            try {
+                const response = await fetch(`${API_BASE}/api/insights`);
+                const data = await response.json();
+                return data.insights || [];
+            } catch (error) {
+                console.warn('Failed to fetch insights from API, using fallback:', error);
+                // Fallback to local analysis if API fails
+                return analyzeInsightsLocal(timeline, tools);
+            }
+        }
+
+        function analyzeInsightsLocal(timeline, tools) {
             const insights = [];
             
             // Find most expensive single call
@@ -364,17 +377,46 @@
                 // Generate insights
                 console.log('Generating insights...');
                 try {
-                    const insights = analyzeInsights(timeline, tools);
+                    const insights = await analyzeInsights(timeline, tools);
                     const insightsEl = document.getElementById('insights');
                     if (insights.length === 0) {
                         insightsEl.innerHTML = '<p style="color: #888;">Not enough data for insights yet. Run more operations!</p>';
                     } else {
-                        insightsEl.innerHTML = insights.map(i => `
-                            <div class="insight-box">
-                                <div class="insight-title">${i.title}</div>
-                                <div class="insight-text">${i.text}</div>
-                            </div>
-                        `).join('');
+                        // Handle both old format (title/text) and new API format (type/severity/message/recommendation/impact)
+                        insightsEl.innerHTML = insights.map(i => {
+                            if (i.title && i.text) {
+                                // Old format (fallback)
+                                return `
+                                    <div class="insight-box">
+                                        <div class="insight-title">${i.title}</div>
+                                        <div class="insight-text">${i.text}</div>
+                                    </div>
+                                `;
+                            } else {
+                                // New API format
+                                const severityColor = {
+                                    high: '#ff6b6b',
+                                    medium: '#ffa500',
+                                    low: '#ffd93d',
+                                    good: '#51cf66'
+                                }[i.severity] || '#888';
+                                const severityEmoji = {
+                                    high: '🚨',
+                                    medium: '⚠️',
+                                    low: '💡',
+                                    good: '✅'
+                                }[i.severity] || '📊';
+                                
+                                return `
+                                    <div class="insight-box" style="border-left: 4px solid ${severityColor};">
+                                        <div class="insight-title">${severityEmoji} ${i.tool || i.type}</div>
+                                        <div class="insight-text"><strong>${i.message}</strong></div>
+                                        ${i.recommendation ? `<div class="insight-text" style="color: #888; margin-top: 8px;">💡 ${i.recommendation}</div>` : ''}
+                                        ${i.impact ? `<div class="insight-text" style="color: #51cf66; margin-top: 8px;">📈 ${i.impact}</div>` : ''}
+                                    </div>
+                                `;
+                            }
+                        }).join('');
                     }
                     console.log('Insights generated:', insights.length);
                 } catch (error) {
