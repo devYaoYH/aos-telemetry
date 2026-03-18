@@ -110,7 +110,40 @@ const routes = {
             totalCost: parseFloat(totalCost.toFixed(4)),
             totalTokens,
             avgCostPerCall: parseFloat((totalCost / toolCalls.length).toFixed(4)),
-            avgTokensPerCall: Math.round(totalTokens / toolCalls.length)
+            avgTokensPerCall: Math.round(toolCalls.length > 0 ? totalTokens / toolCalls.length : 0)
+        }));
+    },
+    
+    '/api/tool-detail': (req, res) => {
+        const parsedUrl = url.parse(req.url, true);
+        const toolName = parsedUrl.query.tool;
+        
+        if (!toolName) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing tool parameter' }));
+            return;
+        }
+        
+        const toolCalls = loadToolCalls().filter(tc => tc.tool === toolName);
+        
+        // Analyze parameter patterns
+        const paramPatterns = {};
+        toolCalls.forEach(tc => {
+            const key = JSON.stringify(tc.params).substring(0, 100);
+            if (!paramPatterns[key]) {
+                paramPatterns[key] = { count: 0, totalCost: 0, totalTokens: 0, example: tc };
+            }
+            paramPatterns[key].count++;
+            paramPatterns[key].totalCost += tc.cost || 0;
+            paramPatterns[key].totalTokens += tc.tokens?.total || 0;
+        });
+        
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({
+            tool: toolName,
+            totalCalls: toolCalls.length,
+            patterns: Object.values(paramPatterns),
+            calls: toolCalls
         }));
     }
 };
@@ -162,6 +195,7 @@ const server = http.createServer((req, res) => {
                         <li><a href="/api/tools" style="color: #667eea;">/api/tools</a> - Tool usage breakdown</li>
                         <li><a href="/api/costs" style="color: #667eea;">/api/costs</a> - Cost analysis</li>
                         <li><a href="/api/timeline" style="color: #667eea;">/api/timeline</a> - Recent tool calls</li>
+                        <li><a href="/api/tool-detail?tool=exec" style="color: #667eea;">/api/tool-detail?tool=X</a> - Detailed analysis per tool</li>
                     </ul>
                     <p style="color: #888; margin-top: 40px;">
                         Dashboard: <a href="/dashboard" style="color: #667eea;">Open Dashboard</a>
