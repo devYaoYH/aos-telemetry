@@ -333,12 +333,26 @@
 
         async function loadData() {
             try {
+                console.log('API_BASE:', API_BASE);
+                console.log('Fetching data...');
+                
                 // Load all data
                 const [summary, tools, timeline] = await Promise.all([
-                    fetch(`${API_BASE}/api/summary`).then(r => r.json()),
-                    fetch(`${API_BASE}/api/tools`).then(r => r.json()),
-                    fetch(`${API_BASE}/api/timeline`).then(r => r.json())
+                    fetch(`${API_BASE}/api/summary`).then(r => {
+                        console.log('Summary response:', r.status);
+                        return r.json();
+                    }),
+                    fetch(`${API_BASE}/api/tools`).then(r => {
+                        console.log('Tools response:', r.status);
+                        return r.json();
+                    }),
+                    fetch(`${API_BASE}/api/timeline`).then(r => {
+                        console.log('Timeline response:', r.status);
+                        return r.json();
+                    })
                 ]);
+                
+                console.log('Data loaded successfully');
 
                 // Update overview
                 document.getElementById('total-cost').textContent = `$${summary.totalCost.toFixed(4)}`;

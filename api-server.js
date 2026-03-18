@@ -179,6 +179,21 @@ const server = http.createServer((req, res) => {
         return;
     }
     
+    // Serve test page
+    if (pathname === '/test' || pathname === '/test/') {
+        const testPath = path.join(__dirname, 'dashboard', 'test.html');
+        fs.readFile(testPath, 'utf8', (err, content) => {
+            if (err) {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Test page not found');
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(content);
+        });
+        return;
+    }
+    
     // Route handling
     if (routes[pathname]) {
         routes[pathname](req, res);

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head><title>AOS API Test</title></head>
+<body style="font-family: monospace; padding: 20px; background: #0a0a0a; color: #e0e0e0;">
+    <h1>AOS API Connection Test</h1>
+    <div id="result">Testing...</div>
+    
+    <script>
+        async function test() {
+            const resultDiv = document.getElementById('result');
+            const apiBase = window.location.origin;
+            
+            resultDiv.innerHTML = `
+                <p>API Base: ${apiBase}</p>
+                <p>Testing connection to ${apiBase}/api/summary...</p>
+            `;
+            
+            try {
+                const response = await fetch(`${apiBase}/api/summary`);
+                const data = await response.json();
+                
+                resultDiv.innerHTML += `
+                    <p style="color: #4ade80;">✅ SUCCESS! API is responding</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                    <p><a href="/dashboard" style="color: #667eea;">Go to Dashboard</a></p>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML += `
+                    <p style="color: #ff6b6b;">❌ ERROR: ${error.message}</p>
+                    <p>This usually means:</p>
+                    <ul>
+                        <li>API server is not running</li>
+                        <li>CORS is blocking the request</li>
+                        <li>Network issue</li>
+                    </ul>
+                `;
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>
