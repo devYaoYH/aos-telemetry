@@ -145,6 +145,117 @@ const routes = {
             patterns: Object.values(paramPatterns),
             calls: toolCalls
         }));
+    },
+    
+    '/api/insights': (req, res) => {
+        const toolCalls = loadToolCalls();
+        const insights = [];
+        
+        if (toolCalls.length === 0) {
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ insights: [], message: 'No data yet - start logging tool calls!' }));
+            return;
+        }
+        
+        // Analyze by tool
+        const byTool = {};
+        toolCalls.forEach(tc => {
+            if (!byTool[tc.tool]) {
+                byTool[tc.tool] = { count: 0, cost: 0, tokens: 0 };
+            }
+            byTool[tc.tool].count++;
+            byTool[tc.tool].cost += tc.cost || 0;
+            byTool[tc.tool].tokens += tc.tokens?.total || 0;
+        });
+        
+        const totalCost = toolCalls.reduce((sum, tc) => sum + (tc.cost || 0), 0);
+        const toolStats = Object.entries(byTool).map(([tool, stats]) => ({
+            tool,
+            ...stats,
+            avgCost: stats.cost / stats.count,
+            costShare: (stats.cost / totalCost) * 100
+        })).sort((a, b) => b.cost - a.cost);
+        
+        // Insight 1: Expensive tools
+        const expensiveTools = toolStats.filter(t => t.avgCost > 0.05);
+        if (expensiveTools.length > 0) {
+            expensiveTools.forEach(t => {
+                insights.push({
+                    type: 'cost',
+                    severity: t.avgCost > 0.1 ? 'high' : 'medium',
+                    tool: t.tool,
+                    message: `${t.tool} averages $${t.avgCost.toFixed(4)} per call (${t.count} calls, $${t.cost.toFixed(4)} total)`,
+                    recommendation: `Consider batching ${t.tool} calls or caching results to reduce costs.`,
+                    impact: `Potential savings: ~$${(t.cost * 0.5).toFixed(4)} if usage reduced by 50%`
+                });
+            });
+        }
+        
+        // Insight 2: High-frequency tools
+        const highFreqTools = toolStats.filter(t => t.count > 5 && t.costShare > 20);
+        if (highFreqTools.length > 0) {
+            highFreqTools.forEach(t => {
+                insights.push({
+                    type: 'usage',
+                    severity: 'medium',
+                    tool: t.tool,
+                    message: `${t.tool} accounts for ${t.costShare.toFixed(1)}% of total cost (${t.count} calls)`,
+                    recommendation: `This is your primary cost driver. Audit whether all ${t.count} calls are necessary.`,
+                    impact: `Eliminating 25% of calls would save $${(t.cost * 0.25).toFixed(4)}`
+                });
+            });
+        }
+        
+        // Insight 3: Token efficiency
+        const avgTokensPerCall = toolCalls.reduce((sum, tc) => sum + (tc.tokens?.total || 0), 0) / toolCalls.length;
+        if (avgTokensPerCall > 30000) {
+            insights.push({
+                type: 'tokens',
+                severity: 'high',
+                message: `Average ${Math.round(avgTokensPerCall).toLocaleString()} tokens per tool call`,
+                recommendation: 'High context size. Review MEMORY.md and loaded files - are all context files necessary?',
+                impact: 'Reducing context by 30% could cut costs by ~30%'
+            });
+        }
+        
+        // Insight 4: Read-heavy patterns
+        const readCalls = byTool['read'] || { count: 0, cost: 0 };
+        const writeCalls = byTool['write'] || { count: 0, cost: 0 };
+        if (readCalls.count > writeCalls.count * 3) {
+            insights.push({
+                type: 'pattern',
+                severity: 'low',
+                message: `Read/write ratio: ${readCalls.count}:${writeCalls.count} (read-heavy)`,
+                recommendation: 'Frequent re-reading of files suggests missing state. Consider caching or memory consolidation.',
+                impact: 'Could reduce redundant reads by storing state between turns'
+            });
+        }
+        
+        // Insight 5: Overall health
+        if (totalCost < 1.0 && toolCalls.length > 10) {
+            insights.push({
+                type: 'health',
+                severity: 'good',
+                message: `Cost efficiency looks good: $${totalCost.toFixed(4)} across ${toolCalls.length} calls`,
+                recommendation: 'Current usage patterns are sustainable. Keep monitoring for trends.',
+                impact: null
+            });
+        }
+        
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({
+            insights,
+            summary: {
+                totalCalls: toolCalls.length,
+                totalCost: parseFloat(totalCost.toFixed(4)),
+                avgCostPerCall: parseFloat((totalCost / toolCalls.length).toFixed(4)),
+                topCostDrivers: toolStats.slice(0, 3).map(t => ({
+                    tool: t.tool,
+                    cost: parseFloat(t.cost.toFixed(4)),
+                    share: parseFloat(t.costShare.toFixed(1))
+                }))
+            }
+        }));
     }
 };
 
