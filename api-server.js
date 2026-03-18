@@ -131,6 +131,21 @@ const server = http.createServer((req, res) => {
         return;
     }
     
+    // Serve dashboard HTML
+    if (pathname === '/dashboard' || pathname === '/dashboard/') {
+        const dashboardPath = path.join(__dirname, 'dashboard', 'index.html');
+        fs.readFile(dashboardPath, 'utf8', (err, content) => {
+            if (err) {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Dashboard not found');
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(content);
+        });
+        return;
+    }
+    
     // Route handling
     if (routes[pathname]) {
         routes[pathname](req, res);
@@ -149,7 +164,7 @@ const server = http.createServer((req, res) => {
                         <li><a href="/api/timeline" style="color: #667eea;">/api/timeline</a> - Recent tool calls</li>
                     </ul>
                     <p style="color: #888; margin-top: 40px;">
-                        Dashboard: <a href="./dashboard/index.html" style="color: #667eea;">Open Dashboard</a>
+                        Dashboard: <a href="/dashboard" style="color: #667eea;">Open Dashboard</a>
                     </p>
                 </body>
             </html>
