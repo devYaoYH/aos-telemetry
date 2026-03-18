@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+
+# Environment & Credentials
+.env
+.env.*
+*.key
+*.pem
+credentials.json
+secrets.json
+config.local.json
+
+# Runtime data
+.turn-state.json
+traces/
+*.jsonl
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
