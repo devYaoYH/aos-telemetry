@@ -355,35 +355,46 @@
                 console.log('Data loaded successfully');
 
                 // Update overview
-                document.getElementById('total-cost').textContent = `$${summary.totalCost.toFixed(4)}`;
-                document.getElementById('total-calls').textContent = summary.totalCalls;
-                document.getElementById('total-tokens').textContent = summary.totalTokens.toLocaleString();
-                document.getElementById('avg-cost').textContent = `$${summary.avgCostPerCall.toFixed(4)}`;
+                console.log('Updating overview with summary:', summary);
+                document.getElementById('total-cost').textContent = `$${(summary.totalCost || 0).toFixed(4)}`;
+                document.getElementById('total-calls').textContent = summary.totalCalls || 0;
+                document.getElementById('total-tokens').textContent = (summary.totalTokens || 0).toLocaleString();
+                document.getElementById('avg-cost').textContent = `$${(summary.avgCostPerCall || 0).toFixed(4)}`;
 
                 // Generate insights
-                const insights = analyzeInsights(timeline, tools);
-                const insightsEl = document.getElementById('insights');
-                if (insights.length === 0) {
-                    insightsEl.innerHTML = '<p style="color: #888;">Not enough data for insights yet. Run more operations!</p>';
-                } else {
-                    insightsEl.innerHTML = insights.map(i => `
-                        <div class="insight-box">
-                            <div class="insight-title">${i.title}</div>
-                            <div class="insight-text">${i.text}</div>
-                        </div>
-                    `).join('');
+                console.log('Generating insights...');
+                try {
+                    const insights = analyzeInsights(timeline, tools);
+                    const insightsEl = document.getElementById('insights');
+                    if (insights.length === 0) {
+                        insightsEl.innerHTML = '<p style="color: #888;">Not enough data for insights yet. Run more operations!</p>';
+                    } else {
+                        insightsEl.innerHTML = insights.map(i => `
+                            <div class="insight-box">
+                                <div class="insight-title">${i.title}</div>
+                                <div class="insight-text">${i.text}</div>
+                            </div>
+                        `).join('');
+                    }
+                    console.log('Insights generated:', insights.length);
+                } catch (error) {
+                    console.error('Error generating insights:', error);
+                    document.getElementById('insights').innerHTML = '<p style="color: #ff6b6b;">Error generating insights</p>';
                 }
 
                 // Tool breakdown with expandable details
+                console.log('Building tool breakdown...');
                 const toolBreakdown = document.getElementById('tool-breakdown');
-                const toolsWithCalls = await Promise.all(tools.map(async tool => {
+                const toolsWithCalls = tools.map(tool => {
                     const calls = timeline.filter(t => t.tool === tool.tool);
                     return { ...tool, calls };
-                }));
+                });
+                console.log('Tools with calls:', toolsWithCalls.length);
 
-                toolBreakdown.innerHTML = toolsWithCalls
-                    .sort((a, b) => b.totalCost - a.totalCost)
-                    .map((tool, idx) => `
+                try {
+                    toolBreakdown.innerHTML = toolsWithCalls
+                        .sort((a, b) => (b.totalCost || 0) - (a.totalCost || 0))
+                        .map((tool, idx) => `
                         <div class="tool-card" onclick="toggleTool(${idx})">
                             <div class="tool-header">
                                 <div class="tool-name">${tool.tool}</div>
@@ -411,11 +422,18 @@
                             </div>
                         </div>
                     `).join('');
+                    console.log('Tool breakdown rendered');
+                } catch (error) {
+                    console.error('Error rendering tool breakdown:', error);
+                    toolBreakdown.innerHTML = '<p style="color: #ff6b6b;">Error rendering tools</p>';
+                }
 
                 // Most expensive calls
-                const topExpensive = document.getElementById('top-expensive');
-                const sorted = [...timeline].sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 5);
-                topExpensive.innerHTML = sorted.map(call => `
+                console.log('Rendering top expensive calls...');
+                try {
+                    const topExpensive = document.getElementById('top-expensive');
+                    const sorted = [...timeline].sort((a, b) => (b.cost || 0) - (a.cost || 0)).slice(0, 5);
+                    topExpensive.innerHTML = sorted.map(call => `
                     <div class="top-call-item">
                         <div style="margin-bottom: 8px;">
                             <strong>${call.tool}</strong>
@@ -426,10 +444,23 @@
                         <div class="call-params">${JSON.stringify(call.params, null, 2)}</div>
                     </div>
                 `).join('');
+                    console.log('Top expensive calls rendered');
+                } catch (error) {
+                    console.error('Error rendering expensive calls:', error);
+                    document.getElementById('top-expensive').innerHTML = '<p style="color: #ff6b6b;">Error rendering expensive calls</p>';
+                }
 
             } catch (error) {
                 console.error('Error loading data:', error);
-                alert('Failed to load data. Make sure API server is running on port 3003.');
+                console.error('Error stack:', error.stack);
+                
+                // Show error in the page instead of alert
+                document.getElementById('insights').innerHTML = `
+                    <div style="background: #ff6b6b; color: white; padding: 16px; border-radius: 8px;">
+                        <strong>Error:</strong> ${error.message}<br>
+                        <small>Check browser console (F12) for details</small>
+                    </div>
+                `;
             }
         }
 
