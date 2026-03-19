@@ -218,6 +218,54 @@ const routes = {
             });
         }
         
+        // Insight 3a: Context limit warnings (based on GitHub #45794, #48252)
+        // Typical model limits: 200K (Sonnet 4), 128K (older), 32K (fallback)
+        const CONTEXT_LIMITS = {
+            'claude-sonnet-4-5': 200000,
+            'claude-sonnet-4': 200000,
+            'claude-sonnet-3-5': 200000,
+            'claude-opus-4': 200000,
+            'claude-haiku': 200000,
+            'default': 128000  // Conservative fallback
+        };
+        
+        // Detect model from tool calls (use most common)
+        const modelCounts = {};
+        toolCalls.forEach(tc => {
+            const model = tc.model || 'default';
+            modelCounts[model] = (modelCounts[model] || 0) + 1;
+        });
+        const primaryModel = Object.keys(modelCounts).sort((a, b) => modelCounts[b] - modelCounts[a])[0] || 'default';
+        const contextLimit = CONTEXT_LIMITS[primaryModel] || CONTEXT_LIMITS['default'];
+        
+        const contextUsagePercent = (avgTokensPerCall / contextLimit) * 100;
+        
+        if (contextUsagePercent >= 95) {
+            insights.push({
+                type: 'context-limit',
+                severity: 'high',
+                message: `Context usage at ${contextUsagePercent.toFixed(1)}% of ${contextLimit.toLocaleString()} token limit`,
+                recommendation: 'CRITICAL: Approaching context limit. UI may break at 100%. Archive old memory files, reduce MEMORY.md size, or clear session state.',
+                impact: 'Prevents UI breakage and context overflow errors. Reduces risk of lost work.'
+            });
+        } else if (contextUsagePercent >= 90) {
+            insights.push({
+                type: 'context-limit',
+                severity: 'high',
+                message: `Context usage at ${contextUsagePercent.toFixed(1)}% of ${contextLimit.toLocaleString()} token limit`,
+                recommendation: 'WARNING: High context usage. Review MEMORY.md and daily logs. Consider archiving old entries.',
+                impact: 'Prevents hitting 100% limit where UI breaks and tool calls fail.'
+            });
+        } else if (contextUsagePercent >= 80) {
+            insights.push({
+                type: 'context-limit',
+                severity: 'medium',
+                message: `Context usage at ${contextUsagePercent.toFixed(1)}% of ${contextLimit.toLocaleString()} token limit`,
+                recommendation: 'Context growing. Plan cleanup: archive low-signal memory entries, compress long files.',
+                impact: 'Proactive management prevents emergency cleanup at 95%+'
+            });
+        }
+        
         // Insight 4: Read-heavy patterns
         const readCalls = byTool['read'] || { count: 0, cost: 0 };
         const writeCalls = byTool['write'] || { count: 0, cost: 0 };
