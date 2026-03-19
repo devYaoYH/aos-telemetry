@@ -46,11 +46,13 @@ Usage:
   aos track-tool <tool> [options]           Track a tool call
   aos end-turn [--cost <amount>]            End current turn
   aos query traces [--limit N]              Query recent traces
+  aos context-health                        Check context usage & warnings
   
 Examples:
   aos start-turn turn-1
   aos track-tool exec --duration 1234 --cost 0.0123 --model sonnet
   aos end-turn --cost 0.05
+  aos context-health
   `);
   process.exit(0);
 }
@@ -177,6 +179,57 @@ async function main() {
             console.log('');
           });
         }
+        break;
+      }
+
+      case 'context-health': {
+        // Load context monitor state if exists
+        const contextStateFile = path.join(process.env.HOME, 'aos-telemetry', '.context-state.json');
+        const { ContextMonitor } = require('./src/context-monitor');
+        const monitor = new ContextMonitor();
+        
+        if (fs.existsSync(contextStateFile)) {
+          const state = JSON.parse(fs.readFileSync(contextStateFile, 'utf8'));
+          monitor.currentTurnTokens = state.currentTurnTokens || 0;
+          monitor.lifetimeTokens = state.lifetimeTokens || 0;
+          monitor.contextSources = state.contextSources || monitor.contextSources;
+        }
+        
+        const health = monitor.getHealthStatus();
+        
+        console.log('📊 Context Health Status\n');
+        
+        // Current turn
+        const currentPct = (health.current.percentage * 100).toFixed(1);
+        const healthIcon = health.health === 'healthy' ? '✅' : 
+                          health.health === 'caution' ? '⚠️' :
+                          health.health === 'warning' ? '🟠' : '🔴';
+        
+        console.log(`${healthIcon} Current Turn: ${currentPct}% (${health.current.tokens.toLocaleString()} / ${health.current.limit.toLocaleString()} tokens)`);
+        console.log(`   Remaining: ${health.current.remaining.toLocaleString()} tokens`);
+        console.log(`   Health: ${health.health.toUpperCase()}\n`);
+        
+        // Lifetime
+        console.log(`📈 Lifetime: ${health.lifetime.tokens.toLocaleString()} tokens across ~${health.lifetime.turns} turns`);
+        console.log(`   Session duration: ${Math.round(health.sessionDuration / 1000 / 60)} minutes\n`);
+        
+        // Top sources
+        console.log(`📂 Context Sources:`);
+        health.topSources.forEach(source => {
+          if (source.tokens > 0) {
+            const pct = ((source.tokens / health.current.tokens) * 100).toFixed(1);
+            console.log(`   ${source.name.padEnd(15)}: ${source.tokens.toLocaleString().padStart(8)} tokens (${pct}%)`);
+          }
+        });
+        
+        // Warnings
+        if (health.warnings.length > 0) {
+          console.log(`\n⚠️  Active Warnings:`);
+          health.warnings.forEach(threshold => {
+            console.log(`   - ${(threshold * 100).toFixed(0)}% threshold crossed`);
+          });
+        }
+        
         break;
       }
 

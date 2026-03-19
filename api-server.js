@@ -304,6 +304,57 @@ const routes = {
                 }))
             }
         }));
+    },
+    
+    '/api/context-health': (req, res) => {
+        // Load context monitor state
+        const contextStateFile = path.join(process.env.HOME, 'aos-telemetry', '.context-state.json');
+        const { ContextMonitor } = require('./src/context-monitor');
+        const monitor = new ContextMonitor();
+        
+        if (fs.existsSync(contextStateFile)) {
+            try {
+                const state = JSON.parse(fs.readFileSync(contextStateFile, 'utf8'));
+                monitor.currentTurnTokens = state.currentTurnTokens || 0;
+                monitor.lifetimeTokens = state.lifetimeTokens || 0;
+                monitor.contextSources = state.contextSources || monitor.contextSources;
+                monitor.sessionStartTime = state.sessionStartTime || Date.now();
+                monitor.turnStartTime = state.turnStartTime || Date.now();
+            } catch (e) {
+                // Ignore parsing errors
+            }
+        }
+        
+        const health = monitor.getHealthStatus();
+        
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({
+            status: 'ok',
+            health: health.health,
+            current: {
+                tokens: health.current.tokens,
+                percentage: parseFloat((health.current.percentage * 100).toFixed(2)),
+                remaining: health.current.remaining,
+                limit: health.current.limit
+            },
+            lifetime: {
+                tokens: health.lifetime.tokens,
+                turns: health.lifetime.turns
+            },
+            sources: health.sources,
+            topSources: health.topSources.map(s => ({
+                name: s.name,
+                tokens: s.tokens,
+                percentage: parseFloat(((s.tokens / health.current.tokens) * 100).toFixed(2))
+            })),
+            warnings: health.warnings.map(threshold => ({
+                threshold: threshold,
+                percentage: parseFloat((threshold * 100).toFixed(0)),
+                crossed: true
+            })),
+            sessionDuration: health.sessionDuration,
+            turnDuration: health.turnDuration
+        }));
     }
 };
 

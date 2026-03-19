@@ -13,6 +13,7 @@
 - ✅ **NEW:** Human-readable context narratives
 - ✅ **NEW:** Auto-commit git integration
 - ✅ **NEW:** Auto-capture tool calls from session history (Phase 2.2 COMPLETE!)
+- ✅ **NEW:** Context limit warnings at 80%, 90%, 95% thresholds (Phase 2 - addresses GitHub #48252, #45794)
 
 **Replaced:** Custom JSONL logs → OpenTelemetry traces
 
@@ -201,6 +202,105 @@ await aos.shutdown();
 ```bash
 node ~/aos-telemetry/cli.js start-turn turn-1 MEMORY.md TOOLS.md custom.md
 ```
+
+## Context Health Monitoring
+
+**NEW in Phase 2:** Prevent UI breakage and context overflow (addresses GitHub #48252, #45794)
+
+**Features:**
+- ✅ Real-time context usage tracking (current vs lifetime)
+- ✅ Automatic warnings at 80%, 90%, 95% thresholds
+- ✅ Context source breakdown (workspace, memory, tools, conversation)
+- ✅ Health status (healthy, caution, warning, critical)
+- ✅ Actionable recommendations based on usage patterns
+
+**CLI Usage:**
+```bash
+# Check context health anytime
+~/aos-telemetry/context-health.sh
+
+# Or via CLI directly
+node ~/aos-telemetry/cli.js context-health
+```
+
+**Example Output:**
+```
+📊 Context Health Status
+
+⚠️ Current Turn: 89.7% (179,478 / 200,000 tokens)
+   Remaining: 20,522 tokens
+   Health: CAUTION
+
+📈 Lifetime: 234,567 tokens across ~12 turns
+   Session duration: 42 minutes
+
+📂 Context Sources:
+   conversation   :  140,000 tokens (78.0%)
+   workspace      :   25,478 tokens (14.2%)
+   memory         :   10,000 tokens (5.6%)
+   tools          :    4,000 tokens (2.2%)
+
+⚠️  Active Warnings:
+   - 80% threshold crossed
+```
+
+**API Endpoint:**
+```bash
+# Query context health via API
+curl http://localhost:3003/api/context-health
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "health": "caution",
+  "current": {
+    "tokens": 179478,
+    "percentage": 89.74,
+    "remaining": 20522,
+    "limit": 200000
+  },
+  "lifetime": {
+    "tokens": 234567,
+    "turns": 12
+  },
+  "sources": {
+    "workspace": 25478,
+    "memory": 10000,
+    "conversation": 140000,
+    "tools": 4000
+  },
+  "warnings": [
+    { "threshold": 0.8, "percentage": 80, "crossed": true }
+  ]
+}
+```
+
+**Programmatic Usage:**
+```javascript
+const { ContextMonitor } = require('./src/context-monitor');
+
+const monitor = new ContextMonitor({ contextLimit: 200000 });
+
+// Start new turn
+monitor.startTurn();
+
+// Add tokens by source
+monitor.addTokens(11478, 'workspace');
+monitor.addTokens(5000, 'memory');
+monitor.addTokens(15000, 'conversation');
+
+// Check health
+const health = monitor.getHealthStatus();
+console.log(`Context at ${(health.current.percentage * 100).toFixed(1)}%`);
+console.log(`Health: ${health.health}`); // healthy, caution, warning, critical
+```
+
+**Warning Levels:**
+- **80%**: MEDIUM - Monitor context, plan cleanup
+- **90%**: HIGH - Approaching limit, reduce context
+- **95%**: CRITICAL - UI may break at 100%, immediate action required
 
 ## Tool Tracking
 
