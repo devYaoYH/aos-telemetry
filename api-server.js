@@ -8,9 +8,21 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const { spawn } = require('child_process');
 
 const PORT = process.env.PORT || 3003;
 const TOOL_CALLS_FILE = path.join(__dirname, 'tool-calls.jsonl');
+
+// Auto-sync OpenClaw sessions on startup
+console.log('🔄 Running auto-sync to load latest OpenClaw session data...');
+const autoSync = spawn('node', [path.join(__dirname, 'auto-sync.js')], { cwd: __dirname });
+autoSync.on('close', (code) => {
+    if (code === 0) {
+        console.log('✅ Auto-sync complete - dashboard will show live data');
+    } else {
+        console.warn(`⚠️  Auto-sync exited with code ${code}`);
+    }
+});
 
 // Read and parse tool calls
 function loadToolCalls() {
