@@ -374,9 +374,9 @@ const server = http.createServer((req, res) => {
         return;
     }
     
-    // Serve dashboard HTML
+    // Serve dashboard HTML (unified version)
     if (pathname === '/dashboard' || pathname === '/dashboard/') {
-        const dashboardPath = path.join(__dirname, 'dashboard', 'index.html');
+        const dashboardPath = path.join(__dirname, 'dashboard', 'unified.html');
         fs.readFile(dashboardPath, 'utf8', (err, content) => {
             if (err) {
                 res.writeHead(404, { 'Content-Type': 'text/plain' });

@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AOS - Unified Agent Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            overflow-x: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1f6feb 0%, #58a6ff 100%);
+            padding: 20px 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 5px;
+        }
+
+        .header .subtitle {
+            color: rgba(255,255,255,0.8);
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            background: #161b22;
+            border-bottom: 1px solid #30363d;
+            padding: 0 30px;
+            gap: 5px;
+        }
+
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            border: none;
+            background: none;
+            color: #8b949e;
+            font-size: 14px;
+            font-weight: 500;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab:hover {
+            color: #c9d1d9;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .tab.active {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+        }
+
+        .content {
+            padding: 30px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .tab-pane {
+            display: none;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .card h2 {
+            font-size: 18px;
+            color: #58a6ff;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #21262d;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .metric-box {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #58a6ff;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        .metric-value.cost {
+            color: #d29922;
+        }
+
+        .metric-value.warning {
+            color: #f85149;
+        }
+
+        .metric-value.success {
+            color: #3fb950;
+        }
+
+        .session-card {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+
+        .session-card.active {
+            border-left: 4px solid #3fb950;
+        }
+
+        .session-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .session-name {
+            font-size: 16px;
+            font-weight: 600;
+            color: #c9d1d9;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-active { background: #238636; color: white; }
+        .badge-heartbeat { background: #9e6a03; color: white; }
+        .badge-cron { background: #6e40aa; color: white; }
+        .badge-hook { background: #6a737d; color: white; }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #21262d;
+            font-size: 14px;
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-row .label {
+            color: #8b949e;
+        }
+
+        .metric-row .value {
+            color: #58a6ff;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-weight: 600;
+        }
+
+        .insight-card {
+            background: #0d1117;
+            border-left: 3px solid #f85149;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 12px;
+        }
+
+        .insight-card.good {
+            border-left-color: #3fb950;
+        }
+
+        .insight-card.medium {
+            border-left-color: #d29922;
+        }
+
+        .insight-severity {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: #f85149;
+            margin-bottom: 8px;
+        }
+
+        .insight-card.good .insight-severity {
+            color: #3fb950;
+        }
+
+        .insight-card.medium .insight-severity {
+            color: #d29922;
+        }
+
+        .insight-message {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .insight-recommendation {
+            font-size: 13px;
+            color: #8b949e;
+            margin-bottom: 8px;
+        }
+
+        .insight-impact {
+            font-size: 13px;
+            color: #58a6ff;
+        }
+
+        .health-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .health-indicator.healthy {
+            background: rgba(56, 189, 80, 0.1);
+            color: #3fb950;
+        }
+
+        .health-indicator.caution {
+            background: rgba(210, 153, 34, 0.1);
+            color: #d29922;
+        }
+
+        .health-indicator.warning {
+            background: rgba(248, 81, 73, 0.1);
+            color: #f85149;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: #21262d;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #238636, #3fb950);
+            transition: width 0.3s ease;
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+
+        .progress-fill.caution {
+            background: linear-gradient(90deg, #9e6a03, #d29922);
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #da3633, #f85149);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #8b949e;
+        }
+
+        .error {
+            background: rgba(248, 81, 73, 0.1);
+            border: 1px solid #f85149;
+            border-radius: 6px;
+            padding: 15px;
+            color: #f85149;
+            margin: 20px 0;
+        }
+
+        .timestamp {
+            color: #6a737d;
+            font-size: 12px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            background: #0d1117;
+            color: #8b949e;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #21262d;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #21262d;
+            font-size: 14px;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.03);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 AOS - Agent Observability System</h1>
+        <div class="subtitle">Real-time telemetry and context monitoring | <span id="timestamp">Loading...</span></div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" data-tab="overview">Overview</button>
+        <button class="tab" data-tab="sessions">Sessions</button>
+        <button class="tab" data-tab="context">Context Health</button>
+        <button class="tab" data-tab="tools">Tool Usage</button>
+        <button class="tab" data-tab="insights">Insights</button>
+    </div>
+
+    <div class="content">
+        <!-- OVERVIEW TAB -->
+        <div class="tab-pane active" id="overview">
+            <div class="card">
+                <h2>System Overview</h2>
+                <div class="metric-grid" id="overview-metrics">
+                    <div class="loading">Loading system metrics...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Active Sessions</h2>
+                <div id="overview-sessions">
+                    <div class="loading">Loading sessions...</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Top Insights</h2>
+                <div id="overview-insights">
+                    <div class="loading">Loading insights...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SESSIONS TAB -->
+        <div class="tab-pane" id="sessions">
+            <div class="card">
+                <h2>All Active Sessions</h2>
+                <div id="sessions-list">
+                    <div class="loading">Loading sessions...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTEXT HEALTH TAB -->
+        <div class="tab-pane" id="context">
+            <div class="card">
+                <h2>Context Health Status</h2>
+                <div id="context-health">
+                    <div class="loading">Loading context health...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TOOL USAGE TAB -->
+        <div class="tab-pane" id="tools">
+            <div class="card">
+                <h2>Tool Call Statistics</h2>
+                <div id="tool-stats">
+                    <div class="loading">Loading tool statistics...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- INSIGHTS TAB -->
+        <div class="tab-pane" id="insights">
+            <div class="card">
+                <h2>Automated Insights & Recommendations</h2>
+                <div id="insights-list">
+                    <div class="loading">Loading insights...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:3003';
+
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Update timestamp
+        function updateTimestamp() {
+            document.getElementById('timestamp').textContent = new Date().toLocaleString('en-US', {
+                timeZone: 'UTC',
+                hour12: false,
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            }) + ' UTC';
+        }
+        updateTimestamp();
+        setInterval(updateTimestamp, 1000);
+
+        // Load all data
+        async function loadData() {
+            try {
+                // Load summary
+                const summary = await fetch(`${API_BASE}/api/summary`).then(r => r.json());
+                
+                // Load insights
+                const insights = await fetch(`${API_BASE}/api/insights`).then(r => r.json());
+                
+                // Load context health
+                const contextHealth = await fetch(`${API_BASE}/api/context-health`).then(r => r.json());
+                
+                // Load tools
+                const tools = await fetch(`${API_BASE}/api/tools`).then(r => r.json());
+                
+                // Render overview
+                renderOverview(summary, insights, contextHealth);
+                
+                // Render sessions
+                renderSessions();
+                
+                // Render context health
+                renderContextHealth(contextHealth);
+                
+                // Render tools
+                renderTools(tools);
+                
+                // Render insights
+                renderInsights(insights);
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.querySelectorAll('.loading').forEach(el => {
+                    el.innerHTML = `<div class="error">Error loading data: ${error.message}<br>Make sure the API server is running at ${API_BASE}</div>`;
+                });
+            }
+        }
+
+        function renderOverview(summary, insights, contextHealth) {
+            // Overview metrics
+            const metricsHTML = `
+                <div class="metric-box">
+                    <div class="metric-label">Tool Calls</div>
+                    <div class="metric-value">${summary.totalCalls}</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Total Cost</div>
+                    <div class="metric-value cost">$${summary.totalCost.toFixed(4)}</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Total Tokens</div>
+                    <div class="metric-value">${summary.totalTokens.toLocaleString()}</div>
+                </div>
+                <div class="metric-box">
+                    <div class="metric-label">Context Health</div>
+                    <div class="metric-value ${contextHealth.health === 'healthy' ? 'success' : 'warning'}">${contextHealth.health.toUpperCase()}</div>
+                </div>
+            `;
+            document.getElementById('overview-metrics').innerHTML = metricsHTML;
+
+            // Top sessions (mock - would need API endpoint)
+            document.getElementById('overview-sessions').innerHTML = `
+                <div class="session-card active">
+                    <div class="session-header">
+                        <span class="session-name">Main Discord Session</span>
+                        <span class="badge badge-active">ACTIVE</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="label">Tokens</span>
+                        <span class="value">115,905</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="label">Running</span>
+                        <span class="value">9+ hours</span>
+                    </div>
+                </div>
+                <p style="color: #8b949e; font-size: 13px; margin-top: 10px;">Note: Full session data requires sessions_list integration</p>
+            `;
+
+            // Top insights
+            const insightsHTML = insights.insights.slice(0, 3).map(insight => {
+                const severityClass = insight.severity === 'good' ? 'good' : insight.severity === 'medium' ? 'medium' : '';
+                return `
+                    <div class="insight-card ${severityClass}">
+                        <div class="insight-severity">${insight.severity}</div>
+                        <div class="insight-message">${insight.message}</div>
+                        ${insight.recommendation ? `<div class="insight-recommendation">${insight.recommendation}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('overview-insights').innerHTML = insightsHTML;
+        }
+
+        function renderSessions() {
+            // This would integrate with sessions_list API
+            document.getElementById('sessions-list').innerHTML = `
+                <div class="error">
+                    <strong>Integration Needed:</strong> This tab requires integration with OpenClaw's sessions_list API.
+                    <br><br>
+                    <strong>What it should show:</strong>
+                    <ul style="margin-top: 10px; padding-left: 20px;">
+                        <li>All 10 active sessions (Discord, heartbeat, cron jobs, webhooks)</li>
+                        <li>Token usage per session</li>
+                        <li>Running time</li>
+                        <li>Cost estimates</li>
+                        <li>Session types (main, heartbeat, cron, hook)</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        function renderContextHealth(health) {
+            const percentage = health.current.percentage;
+            let progressClass = '';
+            let healthIcon = '✅';
+            if (percentage >= 95) {
+                progressClass = 'warning';
+                healthIcon = '🔴';
+            } else if (percentage >= 80) {
+                progressClass = 'caution';
+                healthIcon = '⚠️';
+            }
+
+            const html = `
+                <div class="metric-grid">
+                    <div class="metric-box">
+                        <div class="metric-label">Current Turn</div>
+                        <div class="metric-value">${percentage.toFixed(1)}%</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Tokens Used</div>
+                        <div class="metric-value">${health.current.tokens.toLocaleString()}</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Remaining</div>
+                        <div class="metric-value success">${health.current.remaining.toLocaleString()}</div>
+                    </div>
+                    <div class="metric-box">
+                        <div class="metric-label">Health Status</div>
+                        <div class="health-indicator ${health.health}">
+                            ${healthIcon} ${health.health.toUpperCase()}
+                        </div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px;">
+                    <h3 style="color: #8b949e; font-size: 14px; margin-bottom: 10px;">Usage Progress</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill ${progressClass}" style="width: ${percentage}%">
+                            ${health.current.tokens.toLocaleString()} / ${health.current.limit.toLocaleString()} tokens
+                        </div>
+                    </div>
+                </div>
+
+                ${health.topSources && health.topSources.length > 0 ? `
+                    <div style="margin-top: 20px;">
+                        <h3 style="color: #8b949e; font-size: 14px; margin-bottom: 10px;">Context Sources</h3>
+                        ${health.topSources.filter(s => s.tokens > 0).map(source => `
+                            <div class="metric-row">
+                                <span class="label">${source.name}</span>
+                                <span class="value">${source.tokens.toLocaleString()} tokens (${source.percentage.toFixed(1)}%)</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+
+                ${health.warnings && health.warnings.length > 0 ? `
+                    <div style="margin-top: 20px;">
+                        <h3 style="color: #d29922; font-size: 14px; margin-bottom: 10px;">⚠️ Active Warnings</h3>
+                        ${health.warnings.map(w => `
+                            <div class="insight-card medium">
+                                <div class="insight-message">${w.percentage}% threshold crossed</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            `;
+            document.getElementById('context-health').innerHTML = html;
+        }
+
+        function renderTools(tools) {
+            const html = `
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Tool</th>
+                            <th>Calls</th>
+                            <th>Total Cost</th>
+                            <th>Avg Cost</th>
+                            <th>Total Tokens</th>
+                            <th>Avg Tokens</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${tools.map(tool => `
+                            <tr>
+                                <td><strong>${tool.tool}</strong></td>
+                                <td>${tool.count}</td>
+                                <td style="color: #d29922;">$${tool.totalCost.toFixed(4)}</td>
+                                <td>$${tool.avgCost.toFixed(4)}</td>
+                                <td>${tool.totalTokens.toLocaleString()}</td>
+                                <td>${tool.avgTokens.toLocaleString()}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+            document.getElementById('tool-stats').innerHTML = html;
+        }
+
+        function renderInsights(insights) {
+            const html = insights.insights.map(insight => {
+                const severityClass = insight.severity === 'good' ? 'good' : insight.severity === 'medium' ? 'medium' : '';
+                return `
+                    <div class="insight-card ${severityClass}">
+                        <div class="insight-severity">${insight.severity}</div>
+                        <div class="insight-message">${insight.message}</div>
+                        ${insight.recommendation ? `<div class="insight-recommendation">💡 ${insight.recommendation}</div>` : ''}
+                        ${insight.impact ? `<div class="insight-impact">💰 ${insight.impact}</div>` : ''}
+                    </div>
+                `;
+            }).join('');
+            document.getElementById('insights-list').innerHTML = html;
+        }
+
+        // Load data on page load
+        loadData();
+
+        // Refresh every 10 seconds
+        setInterval(loadData, 10000);
+    </script>
+</body>
+</html>
