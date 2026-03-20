@@ -96,10 +96,8 @@ function getContextBreakdown(events) {
         const msg = event.message;
         const usage = msg.usage || {};
         
-        // Accumulate tokens
-        if (usage.totalTokens) {
-            breakdown.totalTokens += usage.totalTokens;
-        }
+        // Accumulate tokens (input + output = actual context usage)
+        // Note: usage.totalTokens includes cacheRead/cacheWrite which inflates numbers
         if (usage.input) {
             breakdown.inputTokens += usage.input;
         }
@@ -113,9 +111,13 @@ function getContextBreakdown(events) {
             breakdown.cacheWriteTokens += usage.cacheWrite;
         }
         
-        // Track by role
+        // totalTokens = actual context usage (input + output only)
+        const contextTokens = (usage.input || 0) + (usage.output || 0);
+        breakdown.totalTokens += contextTokens;
+        
+        // Track by role (using actual context tokens, not usage.totalTokens)
         if (msg.role && breakdown.byRole[msg.role] !== undefined) {
-            breakdown.byRole[msg.role] += (usage.totalTokens || 0);
+            breakdown.byRole[msg.role] += contextTokens;
         }
         
         // Track by type (content analysis)
@@ -131,11 +133,48 @@ function getContextBreakdown(events) {
             });
         }
         
+        // Extract meaningful content preview
+        let preview = '';
+        let contentType = 'unknown';
+        
+        if (msg.content && Array.isArray(msg.content)) {
+            // Priority 1: Find first text content (most meaningful for timeline)
+            const textContent = msg.content.find(p => p.type === 'text');
+            if (textContent && textContent.text) {
+                preview = textContent.text.split('\n')[0].substring(0, 120);
+                contentType = 'text';
+            } else {
+                // Priority 2: Check for thinking
+                const thinking = msg.content.find(p => p.type === 'thinking');
+                if (thinking && thinking.thinking) {
+                    preview = thinking.thinking.split('\n')[0].substring(0, 120);
+                    contentType = 'thinking';
+                } else {
+                    // Priority 3: Check for tool calls (not results - those are noisy)
+                    const toolCall = msg.content.find(p => p.type === 'toolCall' || p.type === 'tool_use');
+                    if (toolCall) {
+                        const args = toolCall.arguments || toolCall.input || {};
+                        const argStr = Object.keys(args).length > 0 
+                            ? ` (${Object.keys(args).slice(0, 2).join(', ')})` 
+                            : '';
+                        preview = `🔧 ${toolCall.name || 'unknown'}${argStr}`;
+                        contentType = 'toolCall';
+                    }
+                    // Skip tool results - they're too noisy for timeline
+                }
+            }
+        } else if (typeof msg.content === 'string') {
+            preview = msg.content.split('\n')[0].substring(0, 120);
+            contentType = 'text';
+        }
+        
         breakdown.messages.push({
             id: event.id,
             timestamp: event.timestamp,
             role: msg.role,
-            tokens: usage.totalTokens || 0
+            tokens: (usage.input || 0) + (usage.output || 0), // Actual context tokens
+            preview: preview,
+            contentType: contentType
         });
     });
     
