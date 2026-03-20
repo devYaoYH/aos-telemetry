@@ -512,7 +512,7 @@
                 </div>
                 <div class="metric-box">
                     <div class="metric-label">Context Health</div>
-                    <div class="metric-value ${contextHealth.health === 'healthy' ? 'success' : 'warning'}">${contextHealth.health.toUpperCase()}</div>
+                    <div class="metric-value ${contextHealth && contextHealth.health === 'healthy' ? 'success' : 'warning'}">${(contextHealth && contextHealth.health || 'UNKNOWN').toUpperCase()}</div>
                 </div>
             `;
             document.getElementById('overview-metrics').innerHTML = metricsHTML;
@@ -569,7 +569,20 @@
         }
 
         function renderContextHealth(health) {
-            const percentage = health.current.percentage;
+            // Handle both old and new data formats, with null checks
+            if (!health || (!health.current && !health.tokens)) {
+                document.getElementById('contextHealth').innerHTML = `
+                    <div class="error">No context health data available</div>
+                `;
+                return;
+            }
+            
+            // Support both formats: health.current.percentage OR health.tokens.percentage
+            const tokens = health.current || health.tokens || {};
+            const percentage = tokens.percentage || 0;
+            const tokensUsed = tokens.current || tokens.tokens || 0;
+            const remaining = tokens.remaining || 0;
+            
             let progressClass = '';
             let healthIcon = '✅';
             if (percentage >= 95) {
@@ -588,53 +601,38 @@
                     </div>
                     <div class="metric-box">
                         <div class="metric-label">Tokens Used</div>
-                        <div class="metric-value">${health.current.tokens.toLocaleString()}</div>
+                        <div class="metric-value">${tokensUsed.toLocaleString()}</div>
                     </div>
                     <div class="metric-box">
                         <div class="metric-label">Remaining</div>
-                        <div class="metric-value success">${health.current.remaining.toLocaleString()}</div>
-                    </div>
-                    <div class="metric-box">
-                        <div class="metric-label">Health Status</div>
-                        <div class="health-indicator ${health.health}">
-                            ${healthIcon} ${health.health.toUpperCase()}
-                        </div>
+                        <div class="metric-value">${remaining.toLocaleString()}</div>
                     </div>
                 </div>
-
-                <div style="margin-top: 20px;">
-                    <h3 style="color: #8b949e; font-size: 14px; margin-bottom: 10px;">Usage Progress</h3>
+                
+                <div class="progress-container">
                     <div class="progress-bar">
-                        <div class="progress-fill ${progressClass}" style="width: ${percentage}%">
-                            ${health.current.tokens.toLocaleString()} / ${health.current.limit.toLocaleString()} tokens
+                        <div class="progress-fill ${progressClass}" style="width: ${Math.min(percentage, 100)}%">
+                            ${healthIcon} ${percentage.toFixed(1)}%
                         </div>
                     </div>
                 </div>
-
-                ${health.topSources && health.topSources.length > 0 ? `
-                    <div style="margin-top: 20px;">
-                        <h3 style="color: #8b949e; font-size: 14px; margin-bottom: 10px;">Context Sources</h3>
-                        ${health.topSources.filter(s => s.tokens > 0).map(source => `
-                            <div class="metric-row">
-                                <span class="label">${source.name}</span>
-                                <span class="value">${source.tokens.toLocaleString()} tokens (${source.percentage.toFixed(1)}%)</span>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
-
-                ${health.warnings && health.warnings.length > 0 ? `
-                    <div style="margin-top: 20px;">
-                        <h3 style="color: #d29922; font-size: 14px; margin-bottom: 10px;">⚠️ Active Warnings</h3>
-                        ${health.warnings.map(w => `
-                            <div class="insight-card medium">
-                                <div class="insight-message">${w.percentage}% threshold crossed</div>
-                            </div>
-                        `).join('')}
-                    </div>
-                ` : ''}
+                
+                <div class="section">
+                    <h3>Top Context Sources</h3>
+                    ${(health.topSources || health.byType ? `
+                        <div class="source-list">
+                            ${health.byType ? Object.entries(health.byType).map(([name, tokens]) => `
+                                <div class="source-item">
+                                    <span class="label">${name}</span>
+                                    <span class="value">${tokens.toLocaleString()} tokens</span>
+                                </div>
+                            `).join('') : ''}
+                        </div>
+                    ` : '<div>No source data available</div>')}
+                </div>
             `;
-            document.getElementById('context-health').innerHTML = html;
+
+            document.getElementById('contextHealth').innerHTML = html;
         }
 
         function renderTools(tools) {
