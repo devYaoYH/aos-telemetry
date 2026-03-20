@@ -510,19 +510,21 @@
                     return div.innerHTML;
                 };
                 
-                timelineEl.innerHTML = data.breakdown.messages.map(msg => {
-                    const time = new Date(msg.timestamp).toLocaleTimeString();
-                    const tokenDisplay = msg.tokens > 0 ? `${msg.tokens.toLocaleString()} tokens` : '<span style="color: #666;">no usage data</span>';
-                    const preview = msg.preview ? `<div style="color: #aaa; font-size: 13px; margin-top: 4px; font-style: italic;">${escapeHtml(msg.preview)}</div>` : '';
-                    return `
-                        <div class="timeline-item">
-                            <span class="timeline-time">${time}</span>
-                            <span class="timeline-role role-${msg.role}">${msg.role}</span>
-                            <span class="timeline-tokens">${tokenDisplay}</span>
-                            ${preview}
-                        </div>
-                    `;
-                }).join('');
+                timelineEl.innerHTML = data.breakdown.messages
+                    .filter(msg => msg.contentType !== 'unknown' || msg.tokens > 0) // Skip tool results with no preview
+                    .map(msg => {
+                        const time = new Date(msg.timestamp).toLocaleTimeString();
+                        const tokenDisplay = msg.tokens > 0 ? `${msg.tokens.toLocaleString()} tokens` : '<span style="color: #666;">no usage data</span>';
+                        const preview = msg.preview ? `<div style="color: #aaa; font-size: 13px; margin-top: 4px; font-style: italic;">${escapeHtml(msg.preview)}</div>` : '';
+                        return `
+                            <div class="timeline-item">
+                                <span class="timeline-time">${time}</span>
+                                <span class="timeline-role role-${msg.role}">${msg.role}</span>
+                                <span class="timeline-tokens">${tokenDisplay}</span>
+                                ${preview}
+                            </div>
+                        `;
+                    }).join('');
             } else {
                 timelineEl.innerHTML = '<p style="color: #888;">No messages recorded</p>';
             }
