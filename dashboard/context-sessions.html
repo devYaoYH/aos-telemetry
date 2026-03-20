@@ -370,12 +370,7 @@
         }
         
         function viewSessionDetail(sessionId) {
-            fetch(`/api/session-detail?id=${sessionId}`)
-                .then(r => r.json())
-                .then(data => {
-                    alert(`Session: ${sessionId}\n\nMessages: ${data.messageCount}\nEvents: ${data.eventCount}\nSize: ${(data.size / 1024).toFixed(0)} KB\nCreated: ${new Date(data.created).toLocaleString()}\nModified: ${new Date(data.modified).toLocaleString()}`);
-                })
-                .catch(err => console.error('Session detail error:', err));
+            window.location.href = `/session-detail?id=${encodeURIComponent(sessionId)}`;
         }
         
         // Initial load

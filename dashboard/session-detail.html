@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session Detail - AOS Telemetry</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
+            color: #e0e0e0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
+        }
+        
+        .header h1 {
+            font-size: 28px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .back-link {
+            color: #667eea;
+            text-decoration: none;
+            padding: 8px 16px;
+            border: 1px solid #667eea;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        .back-link:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .session-header {
+            background: linear-gradient(135deg, #1e1e2e, #2a2a3e);
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid #333;
+        }
+        
+        .session-meta {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 16px;
+        }
+        
+        .meta-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .meta-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .meta-value {
+            font-size: 16px;
+            color: #e0e0e0;
+            font-weight: 500;
+        }
+        
+        .health-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .health-healthy { background: #10b981; color: white; }
+        .health-caution { background: #f59e0b; color: white; }
+        .health-warning { background: #ef4444; color: white; }
+        .health-critical { background: #dc2626; color: white; }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .card {
+            background: linear-gradient(135deg, #1e1e2e, #2a2a3e);
+            padding: 24px;
+            border-radius: 12px;
+            border: 1px solid #333;
+        }
+        
+        .card h2 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #667eea;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #333;
+        }
+        
+        .stat-row:last-child {
+            border-bottom: none;
+        }
+        
+        .stat-label {
+            color: #aaa;
+        }
+        
+        .stat-value {
+            font-weight: 600;
+            color: #e0e0e0;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #2a2a3e;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transition: width 0.3s;
+        }
+        
+        .breakdown-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: #1a1a2a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .breakdown-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .breakdown-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+        
+        .breakdown-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+        }
+        
+        .breakdown-tokens {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .breakdown-percent {
+            color: #888;
+        }
+        
+        .timeline {
+            margin-top: 16px;
+        }
+        
+        .timeline-item {
+            display: flex;
+            gap: 12px;
+            padding: 12px;
+            background: #1a1a2a;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+        
+        .timeline-time {
+            font-size: 12px;
+            color: #888;
+            min-width: 80px;
+        }
+        
+        .timeline-role {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            min-width: 80px;
+            text-align: center;
+        }
+        
+        .role-user { background: #3b82f6; color: white; }
+        .role-assistant { background: #10b981; color: white; }
+        .role-system { background: #f59e0b; color: white; }
+        
+        .timeline-tokens {
+            color: #667eea;
+            font-weight: 600;
+            margin-left: auto;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 16px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #888;
+        }
+        
+        .error {
+            background: #dc2626;
+            color: white;
+            padding: 16px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Session Detail</h1>
+            <a href="/context-sessions" class="back-link">← Back to Sessions</a>
+        </div>
+        
+        <div id="loading" class="loading">
+            Loading session data...
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="content" style="display: none;">
+            <div class="session-header">
+                <h2 id="session-id" style="color: #e0e0e0; margin-bottom: 8px;"></h2>
+                <div class="session-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">Model</span>
+                        <span class="meta-value" id="model-id">-</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Status</span>
+                        <span class="meta-value" id="health-status"></span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Messages</span>
+                        <span class="meta-value" id="message-count">-</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Last Updated</span>
+                        <span class="meta-value" id="last-update">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>📊 Context Usage</h2>
+                    <div class="stat-row">
+                        <span class="stat-label">Current Tokens</span>
+                        <span class="stat-value" id="current-tokens">-</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="usage-progress"></div>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Percentage Used</span>
+                        <span class="stat-value" id="usage-percent">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Remaining</span>
+                        <span class="stat-value" id="remaining-tokens">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Context Limit</span>
+                        <span class="stat-value" id="context-limit">-</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>💰 Token Breakdown</h2>
+                    <div class="stat-row">
+                        <span class="stat-label">Input Tokens</span>
+                        <span class="stat-value" id="input-tokens">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Output Tokens</span>
+                        <span class="stat-value" id="output-tokens">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Cache Read</span>
+                        <span class="stat-value" id="cache-read">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Cache Write</span>
+                        <span class="stat-value" id="cache-write">-</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">Total (with cache)</span>
+                        <span class="stat-value" id="total-tokens">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>🎯 Token Attribution by Type</h2>
+                    <div id="by-type"></div>
+                </div>
+                
+                <div class="card">
+                    <h2>👤 Token Attribution by Role</h2>
+                    <div id="by-role"></div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>📝 Message Timeline</h2>
+                <div class="timeline" id="timeline"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_BASE = 'http://localhost:3003';
+        
+        // Get session ID from URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const sessionId = urlParams.get('id');
+        
+        if (!sessionId) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').textContent = 'No session ID provided';
+            document.getElementById('error').style.display = 'block';
+        } else {
+            loadSessionDetail(sessionId);
+        }
+        
+        async function loadSessionDetail(sessionId) {
+            try {
+                const response = await fetch(`${API_BASE}/api/session-detail?id=${encodeURIComponent(sessionId)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                displaySession(data);
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            } catch (error) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').textContent = `Error loading session: ${error.message}`;
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        function displaySession(data) {
+            // Session header
+            document.getElementById('session-id').textContent = data.id;
+            document.getElementById('model-id').textContent = data.breakdown.modelId || 'Unknown';
+            document.getElementById('message-count').textContent = data.messageCount.toLocaleString();
+            
+            if (data.breakdown.lastUpdate) {
+                const date = new Date(data.breakdown.lastUpdate);
+                document.getElementById('last-update').textContent = date.toLocaleString();
+            }
+            
+            // Health status
+            const contextLimit = 1000000; // Default 1M tokens
+            const currentTokens = data.breakdown.inputTokens + data.breakdown.outputTokens;
+            const percentage = (currentTokens / contextLimit * 100).toFixed(1);
+            
+            let health = 'healthy';
+            if (percentage >= 95) health = 'critical';
+            else if (percentage >= 90) health = 'warning';
+            else if (percentage >= 80) health = 'caution';
+            
+            const healthBadge = document.getElementById('health-status');
+            healthBadge.innerHTML = `<span class="health-badge health-${health}">${health}</span>`;
+            
+            // Context usage
+            document.getElementById('current-tokens').textContent = currentTokens.toLocaleString();
+            document.getElementById('usage-percent').textContent = `${percentage}%`;
+            document.getElementById('remaining-tokens').textContent = (contextLimit - currentTokens).toLocaleString();
+            document.getElementById('context-limit').textContent = contextLimit.toLocaleString();
+            
+            const progressBar = document.getElementById('usage-progress');
+            progressBar.style.width = `${Math.min(percentage, 100)}%`;
+            
+            if (percentage >= 90) {
+                progressBar.style.background = 'linear-gradient(90deg, #ef4444, #dc2626)';
+            } else if (percentage >= 80) {
+                progressBar.style.background = 'linear-gradient(90deg, #f59e0b, #d97706)';
+            }
+            
+            // Token breakdown
+            document.getElementById('input-tokens').textContent = data.breakdown.inputTokens.toLocaleString();
+            document.getElementById('output-tokens').textContent = data.breakdown.outputTokens.toLocaleString();
+            document.getElementById('cache-read').textContent = data.breakdown.cacheReadTokens.toLocaleString();
+            document.getElementById('cache-write').textContent = data.breakdown.cacheWriteTokens.toLocaleString();
+            document.getElementById('total-tokens').textContent = data.breakdown.totalTokens.toLocaleString();
+            
+            // By Type
+            const byTypeEl = document.getElementById('by-type');
+            const typeColors = {
+                conversation: '#3b82f6',
+                thinking: '#8b5cf6',
+                tools: '#10b981',
+                system: '#f59e0b'
+            };
+            
+            const totalTypeTokens = Object.values(data.breakdown.byType).reduce((a, b) => a + b, 0);
+            
+            byTypeEl.innerHTML = Object.entries(data.breakdown.byType)
+                .sort((a, b) => b[1] - a[1])
+                .map(([type, tokens]) => {
+                    const percent = totalTypeTokens > 0 ? ((tokens / totalTypeTokens) * 100).toFixed(1) : 0;
+                    return `
+                        <div class="breakdown-item">
+                            <div class="breakdown-label">
+                                <div class="breakdown-color" style="background: ${typeColors[type] || '#888'}"></div>
+                                <span>${type.charAt(0).toUpperCase() + type.slice(1)}</span>
+                            </div>
+                            <div class="breakdown-stats">
+                                <span class="breakdown-tokens">${tokens.toLocaleString()}</span>
+                                <span class="breakdown-percent">${percent}%</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            
+            // By Role
+            const byRoleEl = document.getElementById('by-role');
+            const roleColors = {
+                user: '#3b82f6',
+                assistant: '#10b981',
+                system: '#f59e0b'
+            };
+            
+            const totalRoleTokens = Object.values(data.breakdown.byRole).reduce((a, b) => a + b, 0);
+            
+            byRoleEl.innerHTML = Object.entries(data.breakdown.byRole)
+                .sort((a, b) => b[1] - a[1])
+                .map(([role, tokens]) => {
+                    const percent = totalRoleTokens > 0 ? ((tokens / totalRoleTokens) * 100).toFixed(1) : 0;
+                    return `
+                        <div class="breakdown-item">
+                            <div class="breakdown-label">
+                                <div class="breakdown-color" style="background: ${roleColors[role] || '#888'}"></div>
+                                <span>${role.charAt(0).toUpperCase() + role.slice(1)}</span>
+                            </div>
+                            <div class="breakdown-stats">
+                                <span class="breakdown-tokens">${tokens.toLocaleString()}</span>
+                                <span class="breakdown-percent">${percent}%</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            
+            // Timeline
+            const timelineEl = document.getElementById('timeline');
+            if (data.breakdown.messages && data.breakdown.messages.length > 0) {
+                timelineEl.innerHTML = data.breakdown.messages.map(msg => {
+                    const time = new Date(msg.timestamp).toLocaleTimeString();
+                    return `
+                        <div class="timeline-item">
+                            <span class="timeline-time">${time}</span>
+                            <span class="timeline-role role-${msg.role}">${msg.role}</span>
+                            <span class="timeline-tokens">${msg.tokens.toLocaleString()} tokens</span>
+                        </div>
+                    `;
+                }).join('');
+            } else {
+                timelineEl.innerHTML = '<p style="color: #888;">No messages recorded</p>';
+            }
+        }
+    </script>
+</body>
+</html>
