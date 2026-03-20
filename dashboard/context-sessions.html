@@ -104,6 +104,14 @@
         }
         td { color: #c9d1d9; }
         
+        tbody tr {
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        tbody tr:hover {
+            background-color: #21262d;
+        }
+        
         button {
             background: #238636;
             color: white;
@@ -238,11 +246,10 @@
                             <th>Last Modified</th>
                             <th>Age</th>
                             <th>Size</th>
-                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="sessionsTableBody">
-                        <tr><td colspan="5" style="text-align: center; color: #8b949e;">Loading...</td></tr>
+                        <tr><td colspan="4" style="text-align: center; color: #8b949e;">Loading...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -359,8 +366,8 @@
                             <td>${new Date(session.modified).toLocaleString()}</td>
                             <td>${ageStr}</td>
                             <td>${(session.size / 1024).toFixed(0)} KB</td>
-                            <td><button onclick="viewSessionDetail('${session.id}')">View</button></td>
                         `;
+                        row.onclick = () => viewSessionDetail(session.id);
                         tbody.appendChild(row);
                     });
                     
