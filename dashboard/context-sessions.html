@@ -262,10 +262,19 @@
         }
         
         // Real-time Context Health
+        // Real-time Context Health
         function loadContextHealth() {
             fetch('/api/context-health')
                 .then(r => r.json())
                 .then(data => {
+                    // Check if data is valid
+                    if (!data || !data.tokens || data.error) {
+                        console.error('Invalid context health data:', data);
+                        document.getElementById('contextHealthBadge').textContent = 'ERROR';
+                        document.getElementById('contextHealthBadge').style.backgroundColor = '#8b949e';
+                        return;
+                    }
+                    
                     // Update health status
                     const healthBadge = document.getElementById('contextHealthBadge');
                     const healthColor = {
@@ -275,20 +284,20 @@
                         'critical': '#da3633'
                     }[data.health] || '#8b949e';
                     
-                    healthBadge.textContent = data.health.toUpperCase();
+                    healthBadge.textContent = (data.health || 'unknown').toUpperCase();
                     healthBadge.style.backgroundColor = healthColor;
                     
                     // Update session info
                     document.getElementById('sessionId').textContent = (data.sessionId || 'N/A').substring(0, 12) + '...';
                     document.getElementById('modelId').textContent = data.modelId || 'N/A';
-                    document.getElementById('lastUpdate').textContent = new Date(data.lastUpdate).toLocaleString();
+                    document.getElementById('lastUpdate').textContent = data.lastUpdate ? new Date(data.lastUpdate).toLocaleString() : 'N/A';
                     
                     // Update context usage
-                    const percentage = data.tokens.percentage;
+                    const percentage = data.tokens.percentage || 0;
                     document.getElementById('contextPercentage').textContent = percentage.toFixed(1) + '%';
-                    document.getElementById('contextCurrent').textContent = data.tokens.current.toLocaleString();
-                    document.getElementById('contextLimit').textContent = data.tokens.limit.toLocaleString();
-                    document.getElementById('contextRemaining').textContent = data.tokens.remaining.toLocaleString();
+                    document.getElementById('contextCurrent').textContent = (data.tokens.current || 0).toLocaleString();
+                    document.getElementById('contextLimit').textContent = (data.tokens.limit || 1000000).toLocaleString();
+                    document.getElementById('contextRemaining').textContent = (data.tokens.remaining || 0).toLocaleString();
                     
                     // Update progress bar
                     const progressBar = document.getElementById('contextProgressBar');
@@ -296,21 +305,29 @@
                     progressBar.style.backgroundColor = healthColor;
                     
                     // Update breakdown
-                    document.getElementById('breakdownInput').textContent = data.breakdown.input.toLocaleString();
-                    document.getElementById('breakdownOutput').textContent = data.breakdown.output.toLocaleString();
-                    document.getElementById('breakdownCacheRead').textContent = data.breakdown.cacheRead.toLocaleString();
-                    document.getElementById('breakdownCacheWrite').textContent = data.breakdown.cacheWrite.toLocaleString();
+                    if (data.breakdown) {
+                        document.getElementById('breakdownInput').textContent = (data.breakdown.input || 0).toLocaleString();
+                        document.getElementById('breakdownOutput').textContent = (data.breakdown.output || 0).toLocaleString();
+                        document.getElementById('breakdownCacheRead').textContent = (data.breakdown.cacheRead || 0).toLocaleString();
+                        document.getElementById('breakdownCacheWrite').textContent = (data.breakdown.cacheWrite || 0).toLocaleString();
+                    }
                     
                     // Update by type
-                    document.getElementById('typeConversation').textContent = data.byType.conversation.toLocaleString();
-                    document.getElementById('typeThinking').textContent = data.byType.thinking.toLocaleString();
-                    document.getElementById('typeTools').textContent = data.byType.tools.toLocaleString();
-                    document.getElementById('typeSystem').textContent = data.byType.system.toLocaleString();
+                    if (data.byType) {
+                        document.getElementById('typeConversation').textContent = (data.byType.conversation || 0).toLocaleString();
+                        document.getElementById('typeThinking').textContent = (data.byType.thinking || 0).toLocaleString();
+                        document.getElementById('typeTools').textContent = (data.byType.tools || 0).toLocaleString();
+                        document.getElementById('typeSystem').textContent = (data.byType.system || 0).toLocaleString();
+                    }
                     
                     // Update metrics
-                    document.getElementById('messageCount').textContent = data.messageCount.toLocaleString();
+                    document.getElementById('messageCount').textContent = (data.messageCount || 0).toLocaleString();
                 })
-                .catch(err => console.error('Context health error:', err));
+                .catch(err => {
+                    console.error('Context health error:', err);
+                    document.getElementById('contextHealthBadge').textContent = 'ERROR';
+                    document.getElementById('contextHealthBadge').style.backgroundColor = '#da3633';
+                });
         }
         
         // Real-time Sessions
