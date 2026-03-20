@@ -571,7 +571,7 @@
         function renderContextHealth(health) {
             // Handle both old and new data formats, with null checks
             if (!health || (!health.current && !health.tokens)) {
-                document.getElementById('contextHealth').innerHTML = `
+                document.getElementById('context-health').innerHTML = `
                     <div class="error">No context health data available</div>
                 `;
                 return;
@@ -632,7 +632,7 @@
                 </div>
             `;
 
-            document.getElementById('contextHealth').innerHTML = html;
+            document.getElementById('context-health').innerHTML = html;
         }
 
         function renderTools(tools) {
