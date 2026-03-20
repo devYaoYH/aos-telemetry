@@ -601,7 +601,10 @@
                                         (detail.breakdown.inputTokens + detail.breakdown.outputTokens) : 0;
                                     
                                     return `
-                                        <tr style="border-bottom: 1px solid #21262d;">
+                                        <tr style="border-bottom: 1px solid #21262d; cursor: pointer; transition: background-color 0.2s;" 
+                                            onmouseover="this.style.backgroundColor='#21262d'" 
+                                            onmouseout="this.style.backgroundColor='transparent'"
+                                            onclick="window.location.href='/session-detail?id=${session.id}'">
                                             <td style="padding: 8px; font-family: monospace; font-size: 12px; color: #58a6ff;">
                                                 ${session.id.substring(0, 12)}...
                                             </td>
