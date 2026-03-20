@@ -1,8 +1,0 @@
-{
-  "agentName": "openclaw-agent",
-  "workspaceDir": "/root/.openclaw/workspace",
-  "exporterType": "file",
-  "exportPath": "/root/aos-telemetry/traces",
-  "otlpEndpoint": "http://localhost:4318/v1/traces",
-  "comment": "exporterType options: console, file, otlp"
-}

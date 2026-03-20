@@ -1,0 +1,16 @@
+[Unit]
+Description=AOS Telemetry Dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/aos-telemetry
+ExecStart=/usr/bin/node /root/aos-telemetry/api-server.js
+Restart=always
+RestartSec=10
+StandardOutput=append:/var/log/aos-telemetry.log
+StandardError=append:/var/log/aos-telemetry.log
+
+[Install]
+WantedBy=multi-user.target

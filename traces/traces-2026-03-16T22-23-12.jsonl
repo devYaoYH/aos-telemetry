@@ -1,1 +1,0 @@
-{"traceId":"f82caaa07006ec1b5e0d3daca8a1750d","spanId":"2df8c8cc858a7a0e","name":"turn.complete","kind":0,"startTime":[1773699792,976000000],"endTime":[1773699792,976477692],"attributes":{"turn.id":"test-turn-2","turn.total_cost":0.05,"turn.duration_ms":11401},"events":[],"status":{"code":1},"duration":[0,477692]}
