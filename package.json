@@ -4,7 +4,7 @@
   "description": "Agent Observability System - OpenTelemetry-based context provenance tracking",
   "main": "src/index.js",
   "scripts": {
-    "test": "node test/test.js"
+    "test": "node test-dashboard.js"
   },
   "keywords": [
     "opentelemetry",

@@ -94,3 +94,29 @@ sudo systemctl start aos-telemetry
 **Repository:** https://github.com/devYaoYH/aos-telemetry  
 **License:** MIT  
 **Status:** Production-ready (Phase 2 complete)
+
+## Testing
+
+Dashboard functionality is verified with automated Playwright tests:
+
+```bash
+# Run dashboard tests
+npm test
+
+# Or directly
+node test-dashboard.js
+```
+
+**What gets tested:**
+- Dashboard loads without JavaScript errors
+- Tab switching works correctly
+- All DOM elements render properly
+- API endpoints return valid data
+
+**Test output includes:**
+- Console error detection
+- Page error capture
+- Screenshot generation (`/tmp/dashboard-test-*.png`)
+- Pass/fail summary
+
+✅ All tests must pass before pushing changes to production.
