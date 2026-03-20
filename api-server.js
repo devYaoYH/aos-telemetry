@@ -9,6 +9,7 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 const { spawn } = require('child_process');
+const sessionTracker = require('./session-tracker.js');
 
 const PORT = process.env.PORT || 3003;
 const TOOL_CALLS_FILE = path.join(__dirname, 'tool-calls.jsonl');
@@ -367,7 +368,66 @@ const routes = {
             sessionDuration: health.sessionDuration,
             turnDuration: health.turnDuration
         }));
-    }
+    },
+
+    '/api/context-health': (req, res) => {
+        try {
+            const health = sessionTracker.getContextHealth();
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify(health));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
+    
+    '/api/sessions': (req, res) => {
+        try {
+            const sessions = sessionTracker.getAllSessions();
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify(sessions));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
+    
+    '/api/session-detail': (req, res) => {
+        try {
+            const parsedUrl = url.parse(req.url, true);
+            const sessionId = parsedUrl.query.id;
+            
+            if (!sessionId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing session id parameter' }));
+                return;
+            }
+            
+            const sessions = sessionTracker.getAllSessions();
+            const session = sessions.find(s => s.id === sessionId);
+            
+            if (!session) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Session not found' }));
+                return;
+            }
+            
+            const sessionPath = path.join(require('os').homedir(), '.openclaw/agents/main/sessions', session.file);
+            const events = sessionTracker.parseSession(sessionPath);
+            const breakdown = sessionTracker.getContextBreakdown(events);
+            
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({
+                ...session,
+                breakdown,
+                messageCount: events.filter(e => e.type === 'message').length,
+                eventCount: events.length
+            }));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
 };
 
 // HTTP Server

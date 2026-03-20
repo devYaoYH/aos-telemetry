@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AOS - Context & Sessions</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            padding: 20px;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #58a6ff; margin-bottom: 10px; }
+        .subtitle { color: #8b949e; margin-bottom: 30px; }
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #30363d;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: #8b949e;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            color: #58a6ff;
+            border-bottom-color: #58a6ff;
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #58a6ff;
+            font-size: 18px;
+            margin-bottom: 16px;
+        }
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #21262d;
+        }
+        .metric:last-child { border-bottom: none; }
+        .label { color: #8b949e; }
+        .value { color: #58a6ff; font-weight: 600; }
+        
+        .progress-bar {
+            width: 100%;
+            height: 24px;
+            background: #21262d;
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+            margin: 16px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: #3fb950;
+            transition: width 0.3s ease, background-color 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #21262d;
+        }
+        th {
+            color: #8b949e;
+            font-weight: 600;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        td { color: #c9d1d9; }
+        
+        button {
+            background: #238636;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        button:hover { background: #2ea043; }
+        
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+        @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🦞 AOS Telemetry - Context & Sessions</h1>
+        <p class="subtitle">Real-time OpenClaw session monitoring</p>
+        
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('contextHealth')">Context Health</button>
+            <button class="tab" onclick="switchTab('sessions')">Sessions</button>
+        </div>
+        
+        <!-- Context Health Tab -->
+        <div id="contextHealth" class="tab-content active">
+            <div class="card">
+                <h2>Current Session</h2>
+                <div class="metric">
+                    <span class="label">Session ID</span>
+                    <span class="value" id="sessionId">Loading...</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Model</span>
+                    <span class="value" id="modelId">Loading...</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Last Update</span>
+                    <span class="value" id="lastUpdate">Loading...</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Health Status</span>
+                    <span class="badge" id="contextHealthBadge">LOADING</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Context Window Usage</h2>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="contextProgressBar" style="width: 0%">
+                        <span id="contextPercentage">0%</span>
+                    </div>
+                </div>
+                <div class="metric">
+                    <span class="label">Current Tokens</span>
+                    <span class="value" id="contextCurrent">0</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Limit</span>
+                    <span class="value" id="contextLimit">1,000,000</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Remaining</span>
+                    <span class="value" id="contextRemaining">1,000,000</span>
+                </div>
+                <div class="metric">
+                    <span class="label">Message Count</span>
+                    <span class="value" id="messageCount">0</span>
+                </div>
+            </div>
+            
+            <div class="grid">
+                <div class="card">
+                    <h2>Token Breakdown</h2>
+                    <div class="metric">
+                        <span class="label">Input</span>
+                        <span class="value" id="breakdownInput">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Output</span>
+                        <span class="value" id="breakdownOutput">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Cache Read (saved)</span>
+                        <span class="value" id="breakdownCacheRead">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Cache Write</span>
+                        <span class="value" id="breakdownCacheWrite">0</span>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h2>Content Type</h2>
+                    <div class="metric">
+                        <span class="label">Conversation</span>
+                        <span class="value" id="typeConversation">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Thinking</span>
+                        <span class="value" id="typeThinking">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">Tools</span>
+                        <span class="value" id="typeTools">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="label">System</span>
+                        <span class="value" id="typeSystem">0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sessions Tab -->
+        <div id="sessions" class="tab-content">
+            <div class="card">
+                <h2>OpenClaw Sessions</h2>
+                <div class="metric">
+                    <span class="label">Total Sessions</span>
+                    <span class="value" id="totalSessions">0</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>Recent Sessions (Top 20)</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Session ID</th>
+                            <th>Last Modified</th>
+                            <th>Age</th>
+                            <th>Size</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sessionsTableBody">
+                        <tr><td colspan="5" style="text-align: center; color: #8b949e;">Loading...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab switching
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+            document.getElementById(tabName).classList.add('active');
+            
+            if (tabName === 'contextHealth') loadContextHealth();
+            else if (tabName === 'sessions') loadSessions();
+        }
+        
+        // Real-time Context Health
+        function loadContextHealth() {
+            fetch('/api/context-health')
+                .then(r => r.json())
+                .then(data => {
+                    // Update health status
+                    const healthBadge = document.getElementById('contextHealthBadge');
+                    const healthColor = {
+                        'healthy': '#3fb950',
+                        'caution': '#d29922',
+                        'warning': '#f85149',
+                        'critical': '#da3633'
+                    }[data.health] || '#8b949e';
+                    
+                    healthBadge.textContent = data.health.toUpperCase();
+                    healthBadge.style.backgroundColor = healthColor;
+                    
+                    // Update session info
+                    document.getElementById('sessionId').textContent = (data.sessionId || 'N/A').substring(0, 12) + '...';
+                    document.getElementById('modelId').textContent = data.modelId || 'N/A';
+                    document.getElementById('lastUpdate').textContent = new Date(data.lastUpdate).toLocaleString();
+                    
+                    // Update context usage
+                    const percentage = data.tokens.percentage;
+                    document.getElementById('contextPercentage').textContent = percentage.toFixed(1) + '%';
+                    document.getElementById('contextCurrent').textContent = data.tokens.current.toLocaleString();
+                    document.getElementById('contextLimit').textContent = data.tokens.limit.toLocaleString();
+                    document.getElementById('contextRemaining').textContent = data.tokens.remaining.toLocaleString();
+                    
+                    // Update progress bar
+                    const progressBar = document.getElementById('contextProgressBar');
+                    progressBar.style.width = Math.min(percentage, 100) + '%';
+                    progressBar.style.backgroundColor = healthColor;
+                    
+                    // Update breakdown
+                    document.getElementById('breakdownInput').textContent = data.breakdown.input.toLocaleString();
+                    document.getElementById('breakdownOutput').textContent = data.breakdown.output.toLocaleString();
+                    document.getElementById('breakdownCacheRead').textContent = data.breakdown.cacheRead.toLocaleString();
+                    document.getElementById('breakdownCacheWrite').textContent = data.breakdown.cacheWrite.toLocaleString();
+                    
+                    // Update by type
+                    document.getElementById('typeConversation').textContent = data.byType.conversation.toLocaleString();
+                    document.getElementById('typeThinking').textContent = data.byType.thinking.toLocaleString();
+                    document.getElementById('typeTools').textContent = data.byType.tools.toLocaleString();
+                    document.getElementById('typeSystem').textContent = data.byType.system.toLocaleString();
+                    
+                    // Update metrics
+                    document.getElementById('messageCount').textContent = data.messageCount.toLocaleString();
+                })
+                .catch(err => console.error('Context health error:', err));
+        }
+        
+        // Real-time Sessions
+        function loadSessions() {
+            fetch('/api/sessions')
+                .then(r => r.json())
+                .then(sessions => {
+                    const tbody = document.getElementById('sessionsTableBody');
+                    tbody.innerHTML = '';
+                    
+                    sessions.slice(0, 20).forEach(session => {
+                        const row = document.createElement('tr');
+                        const age = Math.floor((Date.now() - new Date(session.modified)) / 1000 / 60);
+                        const ageStr = age < 60 ? `${age}m ago` :
+                                      age < 1440 ? `${Math.floor(age/60)}h ago` :
+                                      `${Math.floor(age/1440)}d ago`;
+                        
+                        row.innerHTML = `
+                            <td style="font-family: monospace; font-size: 12px;">${session.id.substring(0, 12)}...</td>
+                            <td>${new Date(session.modified).toLocaleString()}</td>
+                            <td>${ageStr}</td>
+                            <td>${(session.size / 1024).toFixed(0)} KB</td>
+                            <td><button onclick="viewSessionDetail('${session.id}')">View</button></td>
+                        `;
+                        tbody.appendChild(row));
+                    });
+                    
+                    document.getElementById('totalSessions').textContent = sessions.length.toLocaleString();
+                })
+                .catch(err => console.error('Sessions error:', err));
+        }
+        
+        function viewSessionDetail(sessionId) {
+            fetch(`/api/session-detail?id=${sessionId}`)
+                .then(r => r.json())
+                .then(data => {
+                    alert(`Session: ${sessionId}\n\nMessages: ${data.messageCount}\nEvents: ${data.eventCount}\nSize: ${(data.size / 1024).toFixed(0)} KB\nCreated: ${new Date(data.created).toLocaleString()}\nModified: ${new Date(data.modified).toLocaleString()}`);
+                })
+                .catch(err => console.error('Session detail error:', err));
+        }
+        
+        // Initial load
+        loadContextHealth();
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            const activeTab = document.querySelector('.tab-content.active');
+            if (activeTab.id === 'contextHealth') {
+                loadContextHealth();
+            } else if (activeTab.id === 'sessions') {
+                loadSessions();
+            }
+        }, 30000);
+    </script>
+</body>
+</html>
