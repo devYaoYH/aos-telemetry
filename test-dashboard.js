@@ -108,19 +108,13 @@ async function runTests() {
         '.tab:nth-child(5)'  // Insights tab
     ]);
     
-    // Test context-sessions dashboard
-    const contextResults = await testDashboard(`${baseUrl}/context-sessions`, [
-        'button.tab:nth-child(2)' // Sessions tab
-    ]);
-    
     // Summary
     console.log('\n' + '='.repeat(50));
     console.log('📊 TEST SUMMARY');
     console.log('='.repeat(50));
     console.log(`Unified Dashboard: ${unifiedResults.errors.length} errors, ${unifiedResults.warnings.length} warnings`);
-    console.log(`Context-Sessions: ${contextResults.errors.length} errors, ${contextResults.warnings.length} warnings`);
     
-    const totalErrors = unifiedResults.errors.length + contextResults.errors.length;
+    const totalErrors = unifiedResults.errors.length;
     if (totalErrors > 0) {
         console.log('\n❌ TESTS FAILED');
         process.exit(1);
