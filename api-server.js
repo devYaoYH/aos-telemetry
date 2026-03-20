@@ -462,6 +462,21 @@ const server = http.createServer((req, res) => {
     }
     
     // Serve test page
+    
+    // Serve context-sessions dashboard
+    if (pathname === '/context-sessions' || pathname === '/context-sessions/') {
+        const dashboardPath = path.join(__dirname, 'dashboard', 'context-sessions.html');
+        fs.readFile(dashboardPath, 'utf8', (err, content) => {
+            if (err) {
+                res.writeHead(404, { 'Content-Type': 'text/plain' });
+                res.end('Dashboard not found');
+                return;
+            }
+            res.writeHead(200, { 'Content-Type': 'text/html' });
+            res.end(content);
+        });
+        return;
+    }
     if (pathname === '/test' || pathname === '/test/') {
         const testPath = path.join(__dirname, 'dashboard', 'test.html');
         fs.readFile(testPath, 'utf8', (err, content) => {
