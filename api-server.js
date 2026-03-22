@@ -555,6 +555,74 @@ const routes = {
             res.end(JSON.stringify({ error: error.message }));
         }
     },
+    
+    '/api/health': (req, res) => {
+        try {
+            const toolCalls = loadToolCalls();
+            
+            // Recent activity (last 24h)
+            const oneDayAgo = Date.now() - 24 * 3600 * 1000;
+            const recentCalls = toolCalls.filter(tc => {
+                const timestamp = new Date(tc.timestamp).getTime();
+                return timestamp > oneDayAgo;
+            });
+            
+            // Calculate metrics
+            const totalCalls = recentCalls.length;
+            const errors = recentCalls.filter(tc => tc.status === 'error').length;
+            const errorRate = totalCalls > 0 ? (errors / totalCalls) : 0;
+            const totalCost = recentCalls.reduce((sum, tc) => sum + (tc.cost || 0), 0);
+            const avgCost = totalCalls > 0 ? totalCost / totalCalls : 0;
+            
+            // Health score calculation (0-100)
+            let healthScore = 100;
+            
+            // Penalize high error rates
+            if (errorRate > 0.05) healthScore -= 30; // >5% errors
+            else if (errorRate > 0.02) healthScore -= 15; // >2% errors
+            else if (errorRate > 0.01) healthScore -= 5; // >1% errors
+            
+            // Penalize low activity (expected: at least 100 calls/day)
+            if (totalCalls < 50) healthScore -= 20;
+            else if (totalCalls < 100) healthScore -= 10;
+            
+            // Penalize high costs (expected: <$50/day)
+            if (totalCost > 100) healthScore -= 20;
+            else if (totalCost > 50) healthScore -= 10;
+            
+            // Determine status
+            let status = 'healthy';
+            let message = 'System operating normally';
+            
+            if (healthScore < 50) {
+                status = 'critical';
+                message = 'Multiple issues detected - review error rates and costs';
+            } else if (healthScore < 70) {
+                status = 'degraded';
+                message = 'Some issues detected - monitor closely';
+            } else if (healthScore < 90) {
+                status = 'warning';
+                message = 'Minor issues - no immediate action needed';
+            }
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                status,
+                healthScore,
+                message,
+                metrics: {
+                    callsLast24h: totalCalls,
+                    errorRate: parseFloat((errorRate * 100).toFixed(2)),
+                    totalCost: parseFloat(totalCost.toFixed(2)),
+                    avgCostPerCall: parseFloat(avgCost.toFixed(4))
+                },
+                timestamp: new Date().toISOString()
+            }, null, 2));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
 };
 
 // HTTP Server
