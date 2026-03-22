@@ -505,6 +505,56 @@ const routes = {
             res.end(JSON.stringify({ error: error.message }));
         }
     },
+    
+    '/api/trends/daily': (req, res) => {
+        try {
+            const toolCalls = loadToolCalls();
+            const parsedUrl = url.parse(req.url, true);
+            const days = parseInt(parsedUrl.query.days) || 7;
+            
+            // Group by date
+            const dailyStats = {};
+            
+            toolCalls.forEach(tc => {
+                const date = tc.timestamp ? tc.timestamp.split('T')[0] : 'unknown';
+                if (!dailyStats[date]) {
+                    dailyStats[date] = {
+                        date: date,
+                        calls: 0,
+                        cost: 0,
+                        errors: 0,
+                        tools: new Set(),
+                        avgLatency: []
+                    };
+                }
+                
+                dailyStats[date].calls++;
+                dailyStats[date].cost += tc.cost || 0;
+                if (tc.status === 'error') dailyStats[date].errors++;
+                if (tc.tool) dailyStats[date].tools.add(tc.tool);
+                if (tc.latencyMs) dailyStats[date].avgLatency.push(tc.latencyMs);
+            });
+            
+            // Convert to array and calculate averages
+            const trends = Object.values(dailyStats).map(day => ({
+                date: day.date,
+                calls: day.calls,
+                cost: parseFloat(day.cost.toFixed(2)),
+                errors: day.errors,
+                errorRate: parseFloat((day.errors / day.calls * 100).toFixed(2)),
+                uniqueTools: day.tools.size,
+                avgLatency: day.avgLatency.length > 0 
+                    ? Math.round(day.avgLatency.reduce((a,b) => a+b, 0) / day.avgLatency.length)
+                    : null
+            })).sort((a, b) => b.date.localeCompare(a.date)).slice(0, days);
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ trends }, null, 2));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
 };
 
 // HTTP Server
