@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
- * session-tracker.js - Real-time OpenClaw session monitoring
- * Reads session JSONL files directly for live context tracking
+ * session-tracker.js v2 - Improved message grouping
+ * Groups thinking+text and toolCall+toolResult for better display
  */
 
 const fs = require('fs');
@@ -10,9 +10,6 @@ const os = require('os');
 
 const SESSIONS_DIR = path.join(os.homedir(), '.openclaw/agents/main/sessions');
 
-/**
- * Get the most recently active session
- */
 function getActiveSession() {
     if (!fs.existsSync(SESSIONS_DIR)) {
         return null;
@@ -32,9 +29,6 @@ function getActiveSession() {
     return files[0];
 }
 
-/**
- * Parse a session JSONL file
- */
 function parseSession(sessionPath) {
     const lines = fs.readFileSync(sessionPath, 'utf8')
         .split('\n')
@@ -51,12 +45,206 @@ function parseSession(sessionPath) {
     return events;
 }
 
+function estimateTokens(text) {
+    return Math.ceil(text.length / 4);
+}
+
 /**
- * Get context breakdown from session events
+ * Parse content parts from a message
+ */
+function parseMessageContent(msg) {
+    const parts = {
+        thinking: null,
+        text: null,
+        toolCalls: [],
+        raw: []
+    };
+    
+    if (!msg.content) return parts;
+    
+    if (Array.isArray(msg.content)) {
+        msg.content.forEach(part => {
+            parts.raw.push(part);
+            
+            if (part.type === 'thinking' && part.thinking) {
+                parts.thinking = part.thinking;
+            } else if (part.type === 'text' && part.text) {
+                parts.text = (parts.text || '') + part.text;
+            } else if ((part.type === 'toolCall' || part.type === 'tool_use') && part.name) {
+                parts.toolCalls.push({
+                    id: part.id,
+                    name: part.name,
+                    arguments: part.arguments || part.input || {}
+                });
+            }
+        });
+    } else if (typeof msg.content === 'string') {
+        parts.text = msg.content;
+    }
+    
+    return parts;
+}
+
+/**
+ * Create display rows with proper grouping
+ */
+function createDisplayRows(events) {
+    const rows = [];
+    const messageEvents = events.filter(e => e.type === 'message' && e.message);
+    
+    let i = 0;
+    while (i < messageEvents.length) {
+        const event = messageEvents[i];
+        const msg = event.message;
+        const usage = msg.usage || {};
+        
+        // User messages: simple standalone row
+        if (msg.role === 'user') {
+            const parts = parseMessageContent(msg);
+            rows.push({
+                rowType: 'user',
+                id: event.id,
+                timestamp: event.timestamp,
+                role: 'user',
+                inputTokens: usage.input || 0,
+                outputTokens: usage.output || 0,
+                text: parts.text,
+                rawEvent: event
+            });
+            i++;
+            continue;
+        }
+        
+        // System messages: standalone
+        if (msg.role === 'system') {
+            const parts = parseMessageContent(msg);
+            rows.push({
+                rowType: 'system',
+                id: event.id,
+                timestamp: event.timestamp,
+                role: 'system',
+                inputTokens: usage.input || 0,
+                outputTokens: usage.output || 0,
+                text: parts.text,
+                rawEvent: event
+            });
+            i++;
+            continue;
+        }
+        
+        // Assistant messages: may have thinking+text and/or toolCalls
+        if (msg.role === 'assistant') {
+            const parts = parseMessageContent(msg);
+            
+            const hasThinking = parts.thinking && parts.thinking.trim().length > 0;
+            const hasText = parts.text && parts.text.trim().length > 0;
+            const hasTools = parts.toolCalls.length > 0;
+            
+            // Decide whether to create an assistant row
+            // - If has tools AND (thinking OR text): create assistant row for thinking+text
+            // - If no tools AND (thinking OR text): create assistant row
+            // Exception: if ONLY has thinking+tools (no text), put thinking in toolCall row instead
+            
+            let createAssistantRow = false;
+            if (!hasTools && (hasThinking || hasText)) {
+                // No tools: always create assistant row
+                createAssistantRow = true;
+            } else if (hasTools && hasText) {
+                // Has tools + text: create assistant row for thinking+text
+                createAssistantRow = true;
+            }
+            // Note: if only thinking+tools (no text), skip assistant row, show thinking in toolCall
+            
+            if (createAssistantRow) {
+                rows.push({
+                    rowType: 'assistant',
+                    id: event.id,
+                    timestamp: event.timestamp,
+                    role: 'assistant',
+                    inputTokens: usage.input || 0,
+                    outputTokens: usage.output || 0,
+                    thinking: parts.thinking,
+                    text: parts.text,
+                    thinkingOnly: hasThinking && !hasText, // Flag for rendering
+                    rawEvent: event
+                });
+            }
+            
+            // If there are toolCalls, create individual toolCall rows paired with results
+            if (parts.toolCalls.length > 0) {
+                let j = i + 1;
+                
+                // For each toolCall, find its corresponding toolResult
+                parts.toolCalls.forEach((toolCall, toolIdx) => {
+                    // Find the matching toolResult
+                    let toolResult = null;
+                    
+                    // Look ahead for toolResults
+                    for (let k = j; k < messageEvents.length && messageEvents[k].message.role === 'toolResult'; k++) {
+                        const resultEvent = messageEvents[k];
+                        const resultMsg = resultEvent.message;
+                        
+                        // Match by toolCallId
+                        if (resultMsg.toolCallId === toolCall.id) {
+                            const resultParts = parseMessageContent(resultMsg);
+                            toolResult = {
+                                id: resultEvent.id,
+                                timestamp: resultEvent.timestamp,
+                                toolName: resultMsg.toolName,
+                                text: resultParts.text,
+                                rawEvent: resultEvent
+                            };
+                            break;
+                        }
+                    }
+                    
+                    // Create a toolCall row
+                    // If only thinking+tools (no text), include thinking here
+                    const includeThinking = hasThinking && !hasText;
+                    
+                    rows.push({
+                        rowType: 'toolCall',
+                        id: `${event.id}_tool${toolIdx}`,
+                        timestamp: event.timestamp, // Use assistant message timestamp
+                        role: 'toolCall', // Changed from 'assistant'
+                        inputTokens: 0, // Tokens tracked on parent assistant row
+                        outputTokens: 0,
+                        thinking: includeThinking ? parts.thinking : null,
+                        toolCall: toolCall, // Single tool call
+                        toolResult: toolResult, // Matched result (or null)
+                        rawEvent: event
+                    });
+                });
+                
+                // Skip all toolResult messages we've processed
+                while (j < messageEvents.length && messageEvents[j].message.role === 'toolResult') {
+                    j++;
+                }
+                i = j;
+            } else {
+                i++;
+            }
+            continue;
+        }
+        
+        // Skip standalone toolResult (shouldn't happen, but handle gracefully)
+        if (msg.role === 'toolResult') {
+            i++;
+            continue;
+        }
+        
+        i++;
+    }
+    
+    return rows;
+}
+
+/**
+ * Get context breakdown with grouped display rows
  */
 function getContextBreakdown(events) {
     const breakdown = {
-        messages: [],
+        rows: [],
         totalTokens: 0,
         inputTokens: 0,
         outputTokens: 0,
@@ -91,92 +279,39 @@ function getContextBreakdown(events) {
         breakdown.modelId = modelEvent.modelId || modelEvent.data?.modelId;
     }
     
-    // Process messages
+    // Accumulate token stats
     events.filter(e => e.type === 'message' && e.message).forEach(event => {
         const msg = event.message;
         const usage = msg.usage || {};
         
-        // Accumulate tokens (input + output = actual context usage)
-        // Note: usage.totalTokens includes cacheRead/cacheWrite which inflates numbers
-        if (usage.input) {
-            breakdown.inputTokens += usage.input;
-        }
-        if (usage.output) {
-            breakdown.outputTokens += usage.output;
-        }
-        if (usage.cacheRead) {
-            breakdown.cacheReadTokens += usage.cacheRead;
-        }
-        if (usage.cacheWrite) {
-            breakdown.cacheWriteTokens += usage.cacheWrite;
-        }
+        if (usage.input) breakdown.inputTokens += usage.input;
+        if (usage.output) breakdown.outputTokens += usage.output;
+        if (usage.cacheRead) breakdown.cacheReadTokens += usage.cacheRead;
+        if (usage.cacheWrite) breakdown.cacheWriteTokens += usage.cacheWrite;
         
-        // totalTokens = actual context usage (input + output only)
         const contextTokens = (usage.input || 0) + (usage.output || 0);
-        breakdown.totalTokens += contextTokens;
+        breakdown.totalTokens += (usage.totalTokens || contextTokens);
         
-        // Track by role (using actual context tokens, not usage.totalTokens)
         if (msg.role && breakdown.byRole[msg.role] !== undefined) {
             breakdown.byRole[msg.role] += contextTokens;
         }
         
-        // Track by type (content analysis)
+        // Track by type
         if (msg.content && Array.isArray(msg.content)) {
             msg.content.forEach(part => {
                 if (part.type === 'thinking') {
                     breakdown.byType.thinking += estimateTokens(part.thinking || '');
-                } else if (part.type === 'tool_use' || part.type === 'tool_result') {
+                } else if (part.type === 'toolCall' || part.type === 'tool_use' || part.type === 'tool_result') {
                     breakdown.byType.tools += estimateTokens(JSON.stringify(part));
                 } else if (part.type === 'text') {
                     breakdown.byType.conversation += estimateTokens(part.text || '');
                 }
             });
         }
-        
-        // Extract meaningful content preview
-        let preview = '';
-        let contentType = 'unknown';
-        
-        if (msg.content && Array.isArray(msg.content)) {
-            // Priority 1: Find first text content (most meaningful for timeline)
-            const textContent = msg.content.find(p => p.type === 'text');
-            if (textContent && textContent.text) {
-                preview = textContent.text.split('\n')[0].substring(0, 120);
-                contentType = 'text';
-            } else {
-                // Priority 2: Check for thinking
-                const thinking = msg.content.find(p => p.type === 'thinking');
-                if (thinking && thinking.thinking) {
-                    preview = thinking.thinking.split('\n')[0].substring(0, 120);
-                    contentType = 'thinking';
-                } else {
-                    // Priority 3: Check for tool calls (not results - those are noisy)
-                    const toolCall = msg.content.find(p => p.type === 'toolCall' || p.type === 'tool_use');
-                    if (toolCall) {
-                        const args = toolCall.arguments || toolCall.input || {};
-                        const argStr = Object.keys(args).length > 0 
-                            ? ` (${Object.keys(args).slice(0, 2).join(', ')})` 
-                            : '';
-                        preview = `🔧 ${toolCall.name || 'unknown'}${argStr}`;
-                        contentType = 'toolCall';
-                    }
-                    // Skip tool results - they're too noisy for timeline
-                }
-            }
-        } else if (typeof msg.content === 'string') {
-            preview = msg.content.split('\n')[0].substring(0, 120);
-            contentType = 'text';
-        }
-        
-        breakdown.messages.push({
-            id: event.id,
-            timestamp: event.timestamp,
-            role: msg.role,
-            tokens: (usage.input || 0) + (usage.output || 0), // Actual context tokens
-            preview: preview,
-            contentType: contentType
-        });
     });
+    
+    // Create grouped display rows
+    breakdown.rows = createDisplayRows(events);
     
     // Get last update time
     if (events.length > 0) {
@@ -186,16 +321,6 @@ function getContextBreakdown(events) {
     return breakdown;
 }
 
-/**
- * Rough token estimation (4 chars ≈ 1 token)
- */
-function estimateTokens(text) {
-    return Math.ceil(text.length / 4);
-}
-
-/**
- * Get all sessions with metadata
- */
 function getAllSessions() {
     if (!fs.existsSync(SESSIONS_DIR)) {
         return [];
@@ -208,14 +333,11 @@ function getAllSessions() {
             const stat = fs.statSync(filePath);
             const sessionId = f.replace('.jsonl', '');
             
-            // Quick parse to get metadata
             const firstLine = fs.readFileSync(filePath, 'utf8').split('\n')[0];
             let metadata = {};
             try {
                 metadata = JSON.parse(firstLine);
-            } catch (e) {
-                // Ignore parse errors
-            }
+            } catch (e) {}
             
             return {
                 id: sessionId,
@@ -229,9 +351,6 @@ function getAllSessions() {
         .sort((a, b) => new Date(b.modified) - new Date(a.modified));
 }
 
-/**
- * Get current context health for active session
- */
 function getContextHealth() {
     const activeSession = getActiveSession();
     if (!activeSession) {
@@ -241,12 +360,10 @@ function getContextHealth() {
     const events = parseSession(activeSession.path);
     const breakdown = getContextBreakdown(events);
     
-    // Estimate context limit (default 1M for Claude Sonnet 4)
     const contextLimit = 1000000;
     const currentTokens = breakdown.inputTokens + breakdown.outputTokens;
     const percentage = (currentTokens / contextLimit * 100).toFixed(1);
     
-    // Determine health level
     let health = 'healthy';
     if (percentage >= 95) health = 'critical';
     else if (percentage >= 90) health = 'warning';
@@ -272,7 +389,7 @@ function getContextHealth() {
         byRole: breakdown.byRole,
         health: health,
         totalWithCache: breakdown.totalTokens,
-        messageCount: breakdown.messages.length
+        messageCount: breakdown.rows.length
     };
 }
 
@@ -284,7 +401,6 @@ module.exports = {
     getContextHealth
 };
 
-// CLI usage
 if (require.main === module) {
     const health = getContextHealth();
     console.log(JSON.stringify(health, null, 2));

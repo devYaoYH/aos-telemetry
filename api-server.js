@@ -428,6 +428,83 @@ const routes = {
             res.end(JSON.stringify({ error: error.message }));
         }
     },
+    
+    '/api/session-debug': (req, res) => {
+        try {
+            const parsedUrl = url.parse(req.url, true);
+            const sessionId = parsedUrl.query.id;
+            
+            if (!sessionId) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Missing session id parameter' }));
+                return;
+            }
+            
+            const sessions = sessionTracker.getAllSessions();
+            const session = sessions.find(s => s.id === sessionId);
+            
+            if (!session) {
+                res.writeHead(404, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: 'Session not found' }));
+                return;
+            }
+            
+            const sessionPath = path.join(require('os').homedir(), '.openclaw/agents/main/sessions', session.file);
+            const events = sessionTracker.parseSession(sessionPath);
+            const messageEvents = events.filter(e => e.type === 'message' && e.message);
+            const breakdown = sessionTracker.getContextBreakdown(events);
+            
+            // Count by role
+            const roleCount = {};
+            messageEvents.forEach(e => {
+                const role = e.message.role;
+                roleCount[role] = (roleCount[role] || 0) + 1;
+            });
+            
+            // Count by rowType
+            const rowTypeCount = {};
+            breakdown.rows.forEach(r => {
+                rowTypeCount[r.rowType] = (rowTypeCount[r.rowType] || 0) + 1;
+            });
+            
+            // Count assistant messages with toolCalls
+            const assistantWithTools = messageEvents.filter(e => {
+                if (e.message.role !== 'assistant') return false;
+                const content = e.message.content;
+                if (!Array.isArray(content)) return false;
+                return content.some(p => p.type === 'toolCall' || p.type === 'tool_use');
+            }).length;
+            
+            const totalToolCalls = messageEvents.reduce((sum, e) => {
+                if (e.message.role !== 'assistant') return sum;
+                const content = e.message.content;
+                if (!Array.isArray(content)) return sum;
+                return sum + content.filter(p => p.type === 'toolCall' || p.type === 'tool_use').length;
+            }, 0);
+            
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({
+                totalEvents: events.length,
+                totalMessages: messageEvents.length,
+                totalRows: breakdown.rows.length,
+                messagesByRole: roleCount,
+                rowsByType: rowTypeCount,
+                assistantMessagesWithTools: assistantWithTools,
+                totalToolCalls: totalToolCalls,
+                expectedRows: {
+                    user: roleCount.user || 0,
+                    system: roleCount.system || 0,
+                    assistant: (roleCount.assistant || 0) - assistantWithTools,
+                    toolCall: totalToolCalls,
+                    total: (roleCount.user || 0) + (roleCount.system || 0) + (roleCount.assistant || 0) - assistantWithTools + totalToolCalls
+                },
+                note: 'Each assistant message may produce 1 assistant row + N toolCall rows'
+            }));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
 };
 
 // HTTP Server
