@@ -1,0 +1,16 @@
+[Unit]
+Description=AOS Telemetry API Server
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/aos-telemetry
+ExecStart=/usr/bin/node /root/aos-telemetry/api-server.js
+Restart=always
+RestartSec=3
+StandardOutput=append:/tmp/aos-api.log
+StandardError=append:/tmp/aos-api.log
+
+[Install]
+WantedBy=multi-user.target
