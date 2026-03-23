@@ -623,6 +623,77 @@ const routes = {
             res.end(JSON.stringify({ error: error.message }));
         }
     },
+    
+    '/api/summary': (req, res) => {
+        try {
+            const toolCalls = loadToolCalls();
+            
+            // Overall stats
+            const totalCalls = toolCalls.length;
+            const totalCost = toolCalls.reduce((sum, tc) => sum + (tc.cost || 0), 0);
+            const totalErrors = toolCalls.filter(tc => tc.status === 'error').length;
+            const errorRate = totalCalls > 0 ? (totalErrors / totalCalls) : 0;
+            
+            // Tool breakdown
+            const toolStats = {};
+            toolCalls.forEach(tc => {
+                if (!toolStats[tc.tool]) {
+                    toolStats[tc.tool] = { count: 0, cost: 0 };
+                }
+                toolStats[tc.tool].count++;
+                toolStats[tc.tool].cost += tc.cost || 0;
+            });
+            
+            // Top tools by usage and cost
+            const toolsByUsage = Object.entries(toolStats)
+                .map(([tool, stats]) => ({ tool, count: stats.count, cost: stats.cost }))
+                .sort((a, b) => b.count - a.count)
+                .slice(0, 5);
+                
+            const toolsByCost = Object.entries(toolStats)
+                .map(([tool, stats]) => ({ tool, count: stats.count, cost: parseFloat(stats.cost.toFixed(2)) }))
+                .sort((a, b) => b.cost - a.cost)
+                .slice(0, 5);
+            
+            // Recent activity (last 24h)
+            const oneDayAgo = Date.now() - 24 * 3600 * 1000;
+            const recentCalls = toolCalls.filter(tc => {
+                const timestamp = new Date(tc.timestamp).getTime();
+                return timestamp > oneDayAgo;
+            });
+            const recentCost = recentCalls.reduce((sum, tc) => sum + (tc.cost || 0), 0);
+            const recentErrors = recentCalls.filter(tc => tc.status === 'error').length;
+            
+            // Sessions (unique session IDs)
+            const uniqueSessions = new Set(toolCalls.map(tc => tc.sessionId).filter(Boolean));
+            
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({
+                overview: {
+                    totalCalls,
+                    totalCost: parseFloat(totalCost.toFixed(2)),
+                    totalErrors,
+                    errorRate: parseFloat((errorRate * 100).toFixed(2)),
+                    uniqueSessions: uniqueSessions.size,
+                    avgCostPerCall: parseFloat((totalCost / totalCalls).toFixed(4))
+                },
+                last24h: {
+                    calls: recentCalls.length,
+                    cost: parseFloat(recentCost.toFixed(2)),
+                    errors: recentErrors,
+                    errorRate: parseFloat((recentErrors / recentCalls.length * 100).toFixed(2))
+                },
+                topTools: {
+                    byUsage: toolsByUsage,
+                    byCost: toolsByCost
+                },
+                timestamp: new Date().toISOString()
+            }, null, 2));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
 };
 
 // HTTP Server
