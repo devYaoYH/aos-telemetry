@@ -11,6 +11,7 @@ const url = require('url');
 const { spawn } = require('child_process');
 const sessionTracker = require('./session-tracker.js');
 const { calculateProjections } = require('./cost-projections.js');
+const { analyzeOptimizationOpportunities } = require('./optimization-advisor.js');
 
 const PORT = process.env.PORT || 3003;
 const TOOL_CALLS_FILE = path.join(__dirname, 'tool-calls.jsonl');
@@ -565,6 +566,20 @@ const routes = {
                 'Access-Control-Allow-Origin': '*'
             });
             res.end(JSON.stringify(projections, null, 2));
+        } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: error.message }));
+        }
+    },
+    
+    '/api/optimize': (req, res) => {
+        try {
+            const analysis = analyzeOptimizationOpportunities();
+            res.writeHead(200, { 
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+            });
+            res.end(JSON.stringify(analysis, null, 2));
         } catch (error) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: error.message }));
