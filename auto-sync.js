@@ -55,6 +55,9 @@ function parseSessionFile(filePath, lastProcessedLine = 0) {
     const toolCalls = [];
     const lines = fs.readFileSync(filePath, 'utf8').split('\n').filter(line => line.trim());
     
+    // Extract session ID from filename (e.g., "abc123.jsonl" -> "abc123")
+    const sessionId = path.basename(filePath, '.jsonl');
+    
     for (let i = lastProcessedLine; i < lines.length; i++) {
         try {
             const line = JSON.parse(lines[i]);
@@ -73,6 +76,7 @@ function parseSessionFile(filePath, lastProcessedLine = 0) {
                             timestamp: line.timestamp || msg.timestamp || new Date().toISOString(),
                             tool: toolName,
                             id: toolId,
+                            sessionId: sessionId, // ADD SESSION ID
                             model: msg.model || 'unknown',
                             status: 'success', // Assume success unless we see error
                             // Extract usage/cost from message if available
