@@ -85,8 +85,15 @@ function analyzeTokenAttribution(sessionFile) {
                     const toolCallCost = toolCallTokens * OUTPUT_COST_PER_TOKEN;
                     const textCost = textTokens * OUTPUT_COST_PER_TOKEN;
                     
-                    // Cache write is for the CURRENT turn's output (thinking + tool call + text)
-                    const cacheWriteCost = (usage.cacheWrite || 0) * CACHE_WRITE_COST_PER_TOKEN;
+                    // Cache write breakdown: proportional to output composition
+                    const totalCacheWrite = usage.cacheWrite || 0;
+                    const cacheWriteThinking = totalOutputTokens > 0 ? (thinkingTokens / totalOutputTokens) * totalCacheWrite : 0;
+                    const cacheWriteToolCall = totalOutputTokens > 0 ? (toolCallTokens / totalOutputTokens) * totalCacheWrite : 0;
+                    const cacheWriteText = totalOutputTokens > 0 ? (textTokens / totalOutputTokens) * totalCacheWrite : 0;
+                    
+                    const cacheWriteThinkingCost = cacheWriteThinking * CACHE_WRITE_COST_PER_TOKEN;
+                    const cacheWriteToolCallCost = cacheWriteToolCall * CACHE_WRITE_COST_PER_TOKEN;
+                    const cacheWriteTextCost = cacheWriteText * CACHE_WRITE_COST_PER_TOKEN;
                     
                     // Cache read is PREVIOUS turns (including previous tool results)
                     const cacheReadCost = (usage.cacheRead || 0) * CACHE_READ_COST_PER_TOKEN;
@@ -111,6 +118,10 @@ function analyzeTokenAttribution(sessionFile) {
                         } catch {}
                     }
                     
+                    // Calculate full tool call cost (preparation + cache overhead + result reading)
+                    const fullToolCallCost = toolCallCost + cacheWriteToolCallCost + toolResultCost;
+                    const fullThinkingCost = thinkingCost + cacheWriteThinkingCost;
+                    
                     attributions.push({
                         session: sessionId.substring(0, 8),
                         timestamp: msg.timestamp,
@@ -124,7 +135,10 @@ function analyzeTokenAttribution(sessionFile) {
                             output_toolcall: toolCallTokens,
                             output_text: textTokens,
                             cache_read: usage.cacheRead || 0,
-                            cache_write: usage.cacheWrite || 0,
+                            cache_write_total: usage.cacheWrite || 0,
+                            cache_write_thinking: Math.round(cacheWriteThinking),
+                            cache_write_toolcall: Math.round(cacheWriteToolCall),
+                            cache_write_text: Math.round(cacheWriteText),
                             tool_result: toolResultTokens
                         },
                         
@@ -134,19 +148,27 @@ function analyzeTokenAttribution(sessionFile) {
                             output_thinking: thinkingCost,
                             output_toolcall: toolCallCost,
                             output_text: textCost,
+                            cache_write_thinking: cacheWriteThinkingCost,
+                            cache_write_toolcall: cacheWriteToolCallCost,
+                            cache_write_text: cacheWriteTextCost,
                             cache_read: cacheReadCost,
-                            cache_write: cacheWriteCost,
                             tool_result_read: toolResultCost,
+                            full_toolcall: fullToolCallCost,
+                            full_thinking: fullThinkingCost,
                             total: cost.total || 0
                         },
                         
                         // Percentages
                         percentages: {
-                            thinking: (thinkingCost / (cost.total || 1)) * 100,
-                            toolcall: (toolCallCost / (cost.total || 1)) * 100,
-                            text: (textCost / (cost.total || 1)) * 100,
-                            cache_ops: ((cacheReadCost + cacheWriteCost) / (cost.total || 1)) * 100,
-                            tool_result: (toolResultCost / (cost.total || 1)) * 100
+                            thinking_total: (fullThinkingCost / (cost.total || 1)) * 100,
+                            toolcall_total: (fullToolCallCost / (cost.total || 1)) * 100,
+                            text: ((textCost + cacheWriteTextCost) / (cost.total || 1)) * 100,
+                            cache_ops: (cacheReadCost / (cost.total || 1)) * 100,
+                            toolcall_breakdown: {
+                                output: (toolCallCost / (cost.total || 1)) * 100,
+                                cache_write: (cacheWriteToolCallCost / (cost.total || 1)) * 100,
+                                result_read: (toolResultCost / (cost.total || 1)) * 100
+                            }
                         }
                     });
                 }
@@ -172,22 +194,33 @@ if (require.main === module) {
     
     // Aggregate statistics
     const totals = {
-        thinking_cost: 0,
-        toolcall_cost: 0,
-        text_cost: 0,
+        thinking_output: 0,
+        thinking_cache_write: 0,
+        thinking_total: 0,
+        toolcall_output: 0,
+        toolcall_cache_write: 0,
+        toolcall_result_read: 0,
+        toolcall_total: 0,
+        text_output: 0,
+        text_cache_write: 0,
         cache_read_cost: 0,
-        cache_write_cost: 0,
-        tool_result_cost: 0,
         total_cost: 0
     };
     
     for (const attr of attributions) {
-        totals.thinking_cost += attr.costs.output_thinking;
-        totals.toolcall_cost += attr.costs.output_toolcall;
-        totals.text_cost += attr.costs.output_text;
+        totals.thinking_output += attr.costs.output_thinking;
+        totals.thinking_cache_write += attr.costs.cache_write_thinking;
+        totals.thinking_total += attr.costs.full_thinking;
+        
+        totals.toolcall_output += attr.costs.output_toolcall;
+        totals.toolcall_cache_write += attr.costs.cache_write_toolcall;
+        totals.toolcall_result_read += attr.costs.tool_result_read;
+        totals.toolcall_total += attr.costs.full_toolcall;
+        
+        totals.text_output += attr.costs.output_text;
+        totals.text_cache_write += attr.costs.cache_write_text;
+        
         totals.cache_read_cost += attr.costs.cache_read;
-        totals.cache_write_cost += attr.costs.cache_write;
-        totals.tool_result_cost += attr.costs.tool_result_read;
         totals.total_cost += attr.costs.total;
     }
     
@@ -195,13 +228,16 @@ if (require.main === module) {
     console.log('==========================\n');
     
     console.log(`Total turn cost:          $${totals.total_cost.toFixed(4)}`);
-    console.log(`\nBreakdown:`);
-    console.log(`  Thinking:               $${totals.thinking_cost.toFixed(4)} (${(totals.thinking_cost/totals.total_cost*100).toFixed(1)}%)`);
-    console.log(`  Tool call JSON:         $${totals.toolcall_cost.toFixed(4)} (${(totals.toolcall_cost/totals.total_cost*100).toFixed(1)}%)`);
-    console.log(`  Text responses:         $${totals.text_cost.toFixed(4)} (${(totals.text_cost/totals.total_cost*100).toFixed(1)}%)`);
-    console.log(`  Cache read:             $${totals.cache_read_cost.toFixed(4)} (${(totals.cache_read_cost/totals.total_cost*100).toFixed(1)}%)`);
-    console.log(`  Cache write:            $${totals.cache_write_cost.toFixed(4)} (${(totals.cache_write_cost/totals.total_cost*100).toFixed(1)}%)`);
-    console.log(`  Tool result reading:    $${totals.tool_result_cost.toFixed(4)} (${(totals.tool_result_cost/totals.total_cost*100).toFixed(1)}%)\n`);
+    console.log(`\nFull lifecycle costs (output + cache write + result read):`);
+    console.log(`  Tool calls (FULL):      $${totals.toolcall_total.toFixed(4)} (${(totals.toolcall_total/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`    ↳ Output (JSON):      $${totals.toolcall_output.toFixed(4)} (${(totals.toolcall_output/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`    ↳ Cache write:        $${totals.toolcall_cache_write.toFixed(4)} (${(totals.toolcall_cache_write/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`    ↳ Result read:        $${totals.toolcall_result_read.toFixed(4)} (${(totals.toolcall_result_read/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`  Thinking (FULL):        $${totals.thinking_total.toFixed(4)} (${(totals.thinking_total/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`    ↳ Output:             $${totals.thinking_output.toFixed(4)} (${(totals.thinking_output/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`    ↳ Cache write:        $${totals.thinking_cache_write.toFixed(4)} (${(totals.thinking_cache_write/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`  Text (output+cache):    $${(totals.text_output + totals.text_cache_write).toFixed(4)} (${((totals.text_output + totals.text_cache_write)/totals.total_cost*100).toFixed(1)}%)`);
+    console.log(`  Cache read (context):   $${totals.cache_read_cost.toFixed(4)} (${(totals.cache_read_cost/totals.total_cost*100).toFixed(1)}%)\n`);
     
     // Show a few examples
     console.log('EXAMPLE TURNS:');
@@ -210,25 +246,29 @@ if (require.main === module) {
     for (const attr of attributions.slice(0, 5)) {
         console.log(`${attr.timestamp} - ${attr.tools.join(', ')}`);
         console.log(`  Total: $${attr.costs.total.toFixed(4)}`);
-        console.log(`    Thinking: ${attr.tokens.output_thinking}t ($${attr.costs.output_thinking.toFixed(4)}, ${attr.percentages.thinking.toFixed(1)}%)`);
-        console.log(`    Tool call: ${attr.tokens.output_toolcall}t ($${attr.costs.output_toolcall.toFixed(4)}, ${attr.percentages.toolcall.toFixed(1)}%)`);
-        console.log(`    Cache ops: ${attr.tokens.cache_read + attr.tokens.cache_write}t ($${(attr.costs.cache_read + attr.costs.cache_write).toFixed(4)}, ${attr.percentages.cache_ops.toFixed(1)}%)`);
-        console.log(`    Tool result: ${attr.tokens.tool_result}t ($${attr.costs.tool_result_read.toFixed(4)}, ${attr.percentages.tool_result.toFixed(1)}%)\n`);
+        console.log(`    Tool call FULL: $${attr.costs.full_toolcall.toFixed(4)} (${attr.percentages.toolcall_total.toFixed(1)}%)`);
+        console.log(`      ↳ Output: ${attr.tokens.output_toolcall}t ($${attr.costs.output_toolcall.toFixed(4)})`);
+        console.log(`      ↳ Cache write: ${attr.tokens.cache_write_toolcall}t ($${attr.costs.cache_write_toolcall.toFixed(4)})`);
+        console.log(`      ↳ Result read: ${attr.tokens.tool_result}t ($${attr.costs.tool_result_read.toFixed(4)})`);
+        console.log(`    Thinking: ${attr.tokens.output_thinking}t ($${attr.costs.full_thinking.toFixed(4)}, ${attr.percentages.thinking_total.toFixed(1)}%)`);
+        console.log(`    Cache read: ${attr.tokens.cache_read}t ($${attr.costs.cache_read.toFixed(4)}, ${attr.percentages.cache_ops.toFixed(1)}%)\n`);
     }
     
     console.log('KEY INSIGHTS:');
     console.log('=============\n');
-    console.log('1. Cache write happens in CURRENT turn (thinking + tool call JSON)');
-    console.log('2. Tool result stored with NO usage tracking');
-    console.log('3. Tool result READ in NEXT turn via cache read increase\n');
+    console.log('1. Tool call FULL cost = output (JSON) + cache write (storing it) + result read (next turn)');
+    console.log('2. Cache write happens in CURRENT turn (proportional to output composition)');
+    console.log('3. Tool result stored with NO usage tracking, then READ in next turn\n');
     
-    const avgToolCallPct = attributions.reduce((sum, a) => sum + a.percentages.toolcall, 0) / attributions.length;
+    const avgToolCallPct = attributions.reduce((sum, a) => sum + a.percentages.toolcall_total, 0) / attributions.length;
+    const avgThinkingPct = attributions.reduce((sum, a) => sum + a.percentages.thinking_total, 0) / attributions.length;
     const avgCachePct = attributions.reduce((sum, a) => sum + a.percentages.cache_ops, 0) / attributions.length;
     
     console.log(`Average breakdown per tool call turn:`);
-    console.log(`  Tool call itself: ~${avgToolCallPct.toFixed(1)}%`);
-    console.log(`  Cache operations: ~${avgCachePct.toFixed(1)}%`);
-    console.log(`  Thinking + other: ~${(100 - avgToolCallPct - avgCachePct).toFixed(1)}%`);
+    console.log(`  Tool call (FULL lifecycle): ~${avgToolCallPct.toFixed(1)}%`);
+    console.log(`  Thinking (output + cache):   ~${avgThinkingPct.toFixed(1)}%`);
+    console.log(`  Cache read (context):        ~${avgCachePct.toFixed(1)}%`);
+    console.log(`  Other:                       ~${(100 - avgToolCallPct - avgThinkingPct - avgCachePct).toFixed(1)}%`);
 }
 
 module.exports = { analyzeTokenAttribution, estimateTokens };
