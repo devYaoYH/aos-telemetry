@@ -752,6 +752,30 @@
             document.getElementById('insights-list').innerHTML = html;
         }
 
+        // Hash-based navigation for direct tab links
+        function activateTabFromHash() {
+            const hash = window.location.hash.substring(1); // Remove the '#'
+            if (hash) {
+                const tab = document.querySelector(`[data-tab="${hash}"]`);
+                if (tab) {
+                    tab.click(); // Trigger the tab switch
+                }
+            }
+        }
+
+        // Activate tab from hash on page load
+        activateTabFromHash();
+
+        // Handle hash changes (browser back/forward)
+        window.addEventListener('hashchange', activateTabFromHash);
+
+        // Update hash when tabs are clicked
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                window.location.hash = tab.dataset.tab;
+            });
+        });
+
         // Load data on page load
         loadData();
 
