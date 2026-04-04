@@ -129,6 +129,54 @@ const routes = {
         }));
     },
     
+    '/api/tool-breakdown': (req, res) => {
+        const parsedUrl = url.parse(req.url, true);
+        const toolName = parsedUrl.query.tool;
+        
+        if (!toolName) {
+            res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(JSON.stringify({ error: 'Missing tool parameter' }));
+            return;
+        }
+        
+        const toolCalls = loadToolCalls().filter(tc => tc.tool === toolName);
+        
+        // Group by session for context (each session likely has similar patterns)
+        const bySession = {};
+        toolCalls.forEach(tc => {
+            const sid = tc.sessionId || 'unknown';
+            if (!bySession[sid]) {
+                bySession[sid] = {
+                    sessionId: sid,
+                    count: 0,
+                    totalCost: 0,
+                    totalTokens: 0,
+                    calls: []
+                };
+            }
+            bySession[sid].count++;
+            bySession[sid].totalCost += tc.cost || 0;
+            bySession[sid].totalTokens += tc.tokens?.total || 0;
+            bySession[sid].calls.push(tc);
+        });
+        
+        // Calculate averages and sort by cost
+        const sessions = Object.values(bySession).map(s => ({
+            ...s,
+            avgCost: s.totalCost / s.count,
+            avgTokens: Math.round(s.totalTokens / s.count),
+            calls: undefined // Don't send all calls
+        })).sort((a, b) => b.totalCost - a.totalCost);
+        
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({
+            tool: toolName,
+            totalCalls: toolCalls.length,
+            totalSessions: sessions.length,
+            sessions: sessions.slice(0, 20) // Top 20 sessions
+        }));
+    },
+    
     '/api/tool-detail': (req, res) => {
         const parsedUrl = url.parse(req.url, true);
         const toolName = parsedUrl.query.tool;
@@ -141,24 +189,90 @@ const routes = {
         
         const toolCalls = loadToolCalls().filter(tc => tc.tool === toolName);
         
-        // Analyze parameter patterns
-        const paramPatterns = {};
+        // Smart grouping based on tool type
+        const groups = {};
+        
         toolCalls.forEach(tc => {
-            const key = JSON.stringify(tc.params).substring(0, 100);
-            if (!paramPatterns[key]) {
-                paramPatterns[key] = { count: 0, totalCost: 0, totalTokens: 0, example: tc };
+            let groupKey = 'other';
+            
+            if (tc.params) {
+                switch (toolName) {
+                    case 'exec':
+                        // Group by command (first word)
+                        const cmd = tc.params.command || '';
+                        groupKey = cmd.split(' ')[0] || cmd.split('\n')[0] || 'unknown';
+                        // Shorten long paths
+                        if (groupKey.startsWith('/')) {
+                            groupKey = groupKey.split('/').pop() || groupKey;
+                        }
+                        break;
+                    
+                    case 'read':
+                    case 'write':
+                    case 'edit':
+                        // Group by file extension or directory
+                        const path = tc.params.path || tc.params.file_path || '';
+                        if (path.includes('.')) {
+                            const ext = path.split('.').pop();
+                            groupKey = `.${ext}`;
+                        } else if (path.includes('/')) {
+                            groupKey = path.split('/')[path.split('/').length - 2] || 'root';
+                        } else {
+                            groupKey = 'other';
+                        }
+                        break;
+                    
+                    case 'web_search':
+                        // Group by query length or first few words
+                        const query = tc.params.query || '';
+                        groupKey = query.split(' ').slice(0, 3).join(' ').substring(0, 30) || 'unknown';
+                        break;
+                    
+                    case 'message':
+                        // Group by action
+                        groupKey = tc.params.action || 'send';
+                        break;
+                    
+                    default:
+                        // Generic: group by first param key
+                        const firstKey = Object.keys(tc.params)[0];
+                        if (firstKey) {
+                            const val = String(tc.params[firstKey]).substring(0, 30);
+                            groupKey = `${firstKey}: ${val}`;
+                        }
+                }
             }
-            paramPatterns[key].count++;
-            paramPatterns[key].totalCost += tc.cost || 0;
-            paramPatterns[key].totalTokens += tc.tokens?.total || 0;
+            
+            if (!groups[groupKey]) {
+                groups[groupKey] = { 
+                    name: groupKey, 
+                    count: 0, 
+                    totalCost: 0, 
+                    totalTokens: 0,
+                    avgCost: 0,
+                    avgTokens: 0
+                };
+            }
+            
+            groups[groupKey].count++;
+            groups[groupKey].totalCost += tc.cost || 0;
+            groups[groupKey].totalTokens += tc.tokens?.total || 0;
         });
+        
+        // Calculate averages
+        Object.values(groups).forEach(g => {
+            g.avgCost = g.totalCost / g.count;
+            g.avgTokens = Math.round(g.totalTokens / g.count);
+        });
+        
+        // Sort by total cost descending
+        const sortedGroups = Object.values(groups).sort((a, b) => b.totalCost - a.totalCost);
         
         res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
         res.end(JSON.stringify({
             tool: toolName,
             totalCalls: toolCalls.length,
-            patterns: Object.values(paramPatterns),
-            calls: toolCalls
+            groups: sortedGroups
         }));
     },
     

@@ -76,6 +76,7 @@ function parseSessionFile(filePath, lastProcessedLine = 0) {
                             timestamp: line.timestamp || msg.timestamp || new Date().toISOString(),
                             tool: toolName,
                             id: toolId,
+                            params: item.input || item.parameters || null, // Extract tool parameters
                             sessionId: sessionId, // ADD SESSION ID
                             model: msg.model || 'unknown',
                             status: 'success', // Assume success unless we see error
