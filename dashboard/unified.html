@@ -337,6 +337,38 @@
             border-bottom: 2px solid #21262d;
         }
 
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+            position: relative;
+            padding-right: 30px;
+        }
+
+        th.sortable:hover {
+            color: #58a6ff;
+            background: rgba(88, 166, 255, 0.05);
+        }
+
+        th.sortable::after {
+            content: '⇅';
+            position: absolute;
+            right: 12px;
+            opacity: 0.3;
+            font-size: 14px;
+        }
+
+        th.sortable.asc::after {
+            content: '↑';
+            opacity: 1;
+            color: #58a6ff;
+        }
+
+        th.sortable.desc::after {
+            content: '↓';
+            opacity: 1;
+            color: #58a6ff;
+        }
+
         td {
             padding: 12px;
             border-bottom: 1px solid #21262d;
@@ -707,34 +739,107 @@
             document.getElementById('context-health').innerHTML = html;
         }
 
+        // Tool sorting state
+        let toolsData = [];
+        let currentSortColumn = 'totalCost'; // Default sort by total cost
+        let currentSortDirection = 'desc';
+
         function renderTools(tools) {
+            // Store tools data for sorting
+            toolsData = [...tools];
+            
+            // Sort by default column on first load
+            const sorted = [...toolsData].sort((a, b) => {
+                return (b[currentSortColumn] || 0) - (a[currentSortColumn] || 0);
+            });
+            
             const html = `
-                <table>
+                <table id="tools-table">
                     <thead>
                         <tr>
-                            <th>Tool</th>
-                            <th>Calls</th>
-                            <th>Total Cost</th>
-                            <th>Avg Cost</th>
-                            <th>Total Tokens</th>
-                            <th>Avg Tokens</th>
+                            <th class="sortable" data-column="tool" data-type="string">Tool</th>
+                            <th class="sortable" data-column="count" data-type="number">Calls</th>
+                            <th class="sortable" data-column="totalCost" data-type="number">Total Cost</th>
+                            <th class="sortable" data-column="avgCost" data-type="number">Avg Cost</th>
+                            <th class="sortable" data-column="totalTokens" data-type="number">Total Tokens</th>
+                            <th class="sortable" data-column="avgTokens" data-type="number">Avg Tokens</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        ${tools.map(tool => `
-                            <tr>
-                                <td><strong>${tool.tool}</strong></td>
-                                <td>${tool.count || 0}</td>
-                                <td style="color: #d29922;">$${(tool.totalCost || 0).toFixed(4)}</td>
-                                <td>$${(tool.avgCost || 0).toFixed(4)}</td>
-                                <td>${(tool.totalTokens || 0).toLocaleString()}</td>
-                                <td>${(tool.avgTokens || 0).toLocaleString()}</td>
-                            </tr>
-                        `).join('')}
+                    <tbody id="tools-tbody">
+                        ${renderToolRows(sorted)}
                     </tbody>
                 </table>
             `;
             document.getElementById('tool-stats').innerHTML = html;
+            
+            // Add click handlers to sortable headers
+            document.querySelectorAll('#tools-table th.sortable').forEach(th => {
+                th.addEventListener('click', () => {
+                    const column = th.dataset.column;
+                    const type = th.dataset.type;
+                    
+                    // Toggle sort direction if same column, otherwise default to descending
+                    if (currentSortColumn === column) {
+                        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSortColumn = column;
+                        currentSortDirection = type === 'string' ? 'asc' : 'desc'; // Strings default to asc, numbers to desc
+                    }
+                    
+                    sortAndRenderTools();
+                });
+            });
+            
+            // Set initial sort indicator
+            updateSortIndicators();
+        }
+
+        function renderToolRows(tools) {
+            return tools.map(tool => `
+                <tr>
+                    <td><strong>${tool.tool}</strong></td>
+                    <td>${(tool.count || 0).toLocaleString()}</td>
+                    <td style="color: #d29922;">$${(tool.totalCost || 0).toFixed(4)}</td>
+                    <td>$${(tool.avgCost || 0).toFixed(4)}</td>
+                    <td>${(tool.totalTokens || 0).toLocaleString()}</td>
+                    <td>${(tool.avgTokens || 0).toLocaleString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function sortAndRenderTools() {
+            const sorted = [...toolsData].sort((a, b) => {
+                let aVal = a[currentSortColumn] || 0;
+                let bVal = b[currentSortColumn] || 0;
+                
+                // String comparison for tool names
+                if (typeof aVal === 'string') {
+                    return currentSortDirection === 'asc' 
+                        ? aVal.localeCompare(bVal)
+                        : bVal.localeCompare(aVal);
+                }
+                
+                // Numeric comparison
+                return currentSortDirection === 'asc' 
+                    ? aVal - bVal
+                    : bVal - aVal;
+            });
+            
+            document.getElementById('tools-tbody').innerHTML = renderToolRows(sorted);
+            updateSortIndicators();
+        }
+
+        function updateSortIndicators() {
+            // Remove all sort indicators
+            document.querySelectorAll('#tools-table th.sortable').forEach(th => {
+                th.classList.remove('asc', 'desc');
+            });
+            
+            // Add indicator to current sort column
+            const currentTh = document.querySelector(`#tools-table th[data-column="${currentSortColumn}"]`);
+            if (currentTh) {
+                currentTh.classList.add(currentSortDirection);
+            }
         }
 
         function renderInsights(insights) {
