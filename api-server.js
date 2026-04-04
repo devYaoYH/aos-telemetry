@@ -12,6 +12,7 @@ const { spawn } = require('child_process');
 const sessionTracker = require('./session-tracker.js');
 const { calculateProjections } = require('./cost-projections.js');
 const { analyzeOptimizationOpportunities } = require('./optimization-advisor.js');
+const { parseBashChain, getCommandType } = require('./bash-parser.js');
 
 const PORT = process.env.PORT || 3003;
 const TOOL_CALLS_FILE = path.join(__dirname, 'tool-calls.jsonl');
@@ -198,12 +199,33 @@ const routes = {
             if (tc.params) {
                 switch (toolName) {
                     case 'exec':
-                        // Group by command (first word)
+                        // Use bash-parser to handle compound commands (cd && git, pipes, etc.)
                         const cmd = tc.params.command || '';
-                        groupKey = cmd.split(' ')[0] || cmd.split('\n')[0] || 'unknown';
-                        // Shorten long paths
-                        if (groupKey.startsWith('/')) {
-                            groupKey = groupKey.split('/').pop() || groupKey;
+                        try {
+                            const chain = parseBashChain(cmd);
+                            if (chain.length > 0) {
+                                // For compound commands, use the LAST non-cd command (usually the "real work")
+                                const nonCdCommands = chain.filter(c => c.type !== 'cd');
+                                if (nonCdCommands.length > 0) {
+                                    groupKey = nonCdCommands[nonCdCommands.length - 1].type;
+                                } else if (chain.length === 1 && chain[0].type === 'cd') {
+                                    groupKey = 'cd';
+                                } else {
+                                    groupKey = chain[0].type;
+                                }
+                            } else {
+                                // Fallback: simple split
+                                groupKey = cmd.split(' ')[0] || cmd.split('\n')[0] || 'unknown';
+                                if (groupKey.startsWith('/')) {
+                                    groupKey = groupKey.split('/').pop() || groupKey;
+                                }
+                            }
+                        } catch (e) {
+                            // Fallback on parse error
+                            groupKey = cmd.split(' ')[0] || 'unknown';
+                            if (groupKey.startsWith('/')) {
+                                groupKey = groupKey.split('/').pop() || groupKey;
+                            }
                         }
                         break;
                     
