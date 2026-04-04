@@ -496,19 +496,22 @@
         }
 
         function renderOverview(summary, insights, contextHealth) {
+            // Handle both old format and new nested format
+            const stats = summary.overview || summary;
+            
             // Overview metrics
             const metricsHTML = `
                 <div class="metric-box">
                     <div class="metric-label">Tool Calls</div>
-                    <div class="metric-value">${summary.totalCalls}</div>
+                    <div class="metric-value">${(stats.totalCalls || 0).toLocaleString()}</div>
                 </div>
                 <div class="metric-box">
                     <div class="metric-label">Total Cost</div>
-                    <div class="metric-value cost">$${summary.totalCost.toFixed(4)}</div>
+                    <div class="metric-value cost">$${(stats.totalCost || 0).toFixed(2)}</div>
                 </div>
                 <div class="metric-box">
-                    <div class="metric-label">Total Tokens</div>
-                    <div class="metric-value">${summary.totalTokens.toLocaleString()}</div>
+                    <div class="metric-label">Avg Cost/Call</div>
+                    <div class="metric-value">$${(stats.avgCostPerCall || 0).toFixed(4)}</div>
                 </div>
                 <div class="metric-box">
                     <div class="metric-label">Context Health</div>
@@ -612,7 +615,7 @@
                                                 ${ageStr}
                                             </td>
                                             <td style="padding: 8px; text-align: right; color: #c9d1d9;">
-                                                ${(session.size / 1024).toFixed(0)} KB
+                                                ${((session.size || 0) / 1024).toFixed(0)} KB
                                             </td>
                                             <td style="padding: 8px; text-align: right; color: #c9d1d9;">
                                                 ${detail ? detail.messageCount : '-'}
@@ -666,22 +669,22 @@
                 <div class="metric-grid">
                     <div class="metric-box">
                         <div class="metric-label">Current Turn</div>
-                        <div class="metric-value">${percentage.toFixed(1)}%</div>
+                        <div class="metric-value">${(percentage || 0).toFixed(1)}%</div>
                     </div>
                     <div class="metric-box">
                         <div class="metric-label">Tokens Used</div>
-                        <div class="metric-value">${tokensUsed.toLocaleString()}</div>
+                        <div class="metric-value">${(tokensUsed || 0).toLocaleString()}</div>
                     </div>
                     <div class="metric-box">
                         <div class="metric-label">Remaining</div>
-                        <div class="metric-value">${remaining.toLocaleString()}</div>
+                        <div class="metric-value">${(remaining || 0).toLocaleString()}</div>
                     </div>
                 </div>
                 
                 <div class="progress-container">
                     <div class="progress-bar">
-                        <div class="progress-fill ${progressClass}" style="width: ${Math.min(percentage, 100)}%">
-                            ${healthIcon} ${percentage.toFixed(1)}%
+                        <div class="progress-fill ${progressClass}" style="width: ${Math.min((percentage || 0), 100)}%">
+                            ${healthIcon} ${(percentage || 0).toFixed(1)}%
                         </div>
                     </div>
                 </div>
@@ -721,11 +724,11 @@
                         ${tools.map(tool => `
                             <tr>
                                 <td><strong>${tool.tool}</strong></td>
-                                <td>${tool.count}</td>
-                                <td style="color: #d29922;">$${tool.totalCost.toFixed(4)}</td>
-                                <td>$${tool.avgCost.toFixed(4)}</td>
-                                <td>${tool.totalTokens.toLocaleString()}</td>
-                                <td>${tool.avgTokens.toLocaleString()}</td>
+                                <td>${tool.count || 0}</td>
+                                <td style="color: #d29922;">$${(tool.totalCost || 0).toFixed(4)}</td>
+                                <td>$${(tool.avgCost || 0).toFixed(4)}</td>
+                                <td>${(tool.totalTokens || 0).toLocaleString()}</td>
+                                <td>${(tool.avgTokens || 0).toLocaleString()}</td>
                             </tr>
                         `).join('')}
                     </tbody>

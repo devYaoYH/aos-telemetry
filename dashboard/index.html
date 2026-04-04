@@ -306,11 +306,11 @@
             
             // Find most expensive single call
             const sorted = [...timeline].sort((a, b) => (b.cost || 0) - (a.cost || 0));
-            if (sorted.length > 0 && sorted[0].cost > 0.05) {
+            if (sorted.length > 0 && (sorted[0].cost || 0) > 0.05) {
                 const top = sorted[0];
                 insights.push({
                     title: '💸 Highest Cost Single Call',
-                    text: `${top.tool} cost $${top.cost.toFixed(4)} (${top.tokens?.total.toLocaleString()} tokens). ${
+                    text: `${top.tool} cost $${(top.cost || 0).toFixed(4)} (${(top.tokens?.total || 0).toLocaleString()} tokens). ${
                         top.tool === 'read' ? `Reading large file: ${JSON.stringify(top.params).substring(0, 100)}...` :
                         top.tool === 'exec' ? `Command: ${top.params?.command?.substring(0, 100)}...` :
                         'See details below.'
@@ -369,10 +369,12 @@
 
                 // Update overview
                 console.log('Updating overview with summary:', summary);
-                document.getElementById('total-cost').textContent = `$${(summary.totalCost || 0).toFixed(4)}`;
-                document.getElementById('total-calls').textContent = summary.totalCalls || 0;
-                document.getElementById('total-tokens').textContent = (summary.totalTokens || 0).toLocaleString();
-                document.getElementById('avg-cost').textContent = `$${(summary.avgCostPerCall || 0).toFixed(4)}`;
+                // Handle both old format and new nested format
+                const stats = summary.overview || summary;
+                document.getElementById('total-cost').textContent = `$${(stats.totalCost || 0).toFixed(2)}`;
+                document.getElementById('total-calls').textContent = (stats.totalCalls || 0).toLocaleString();
+                document.getElementById('total-tokens').textContent = 'N/A'; // Not in new API format
+                document.getElementById('avg-cost').textContent = `$${(stats.avgCostPerCall || 0).toFixed(4)}`;
 
                 // Generate insights
                 console.log('Generating insights...');
@@ -443,10 +445,10 @@
                                 <button class="expand-btn" id="expand-btn-${idx}">Show Details</button>
                             </div>
                             <div class="tool-summary">
-                                <div class="tool-metric"><strong>${tool.count}</strong> calls</div>
-                                <div class="tool-metric"><strong>$${tool.totalCost.toFixed(4)}</strong> total cost</div>
-                                <div class="tool-metric"><strong>${tool.totalTokens.toLocaleString()}</strong> tokens</div>
-                                <div class="tool-metric"><strong>$${tool.avgCost.toFixed(4)}</strong> avg/call</div>
+                                <div class="tool-metric"><strong>${tool.count || 0}</strong> calls</div>
+                                <div class="tool-metric"><strong>$${(tool.totalCost || 0).toFixed(4)}</strong> total cost</div>
+                                <div class="tool-metric"><strong>${(tool.totalTokens || 0).toLocaleString()}</strong> tokens</div>
+                                <div class="tool-metric"><strong>$${(tool.avgCost || 0).toFixed(4)}</strong> avg/call</div>
                             </div>
                             <div class="tool-details" id="tool-details-${idx}">
                                 <h3 style="color: #888; margin-bottom: 12px;">Individual Calls:</h3>
