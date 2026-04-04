@@ -532,12 +532,27 @@ const routes = {
             const events = sessionTracker.parseSession(sessionPath);
             const breakdown = sessionTracker.getContextBreakdown(events);
             
+            // Add tool usage summary for this session
+            const toolCalls = loadToolCalls().filter(tc => tc.sessionId === sessionId);
+            const toolStats = {};
+            toolCalls.forEach(tc => {
+                if (!toolStats[tc.tool]) {
+                    toolStats[tc.tool] = { tool: tc.tool, count: 0, cost: 0, tokens: 0 };
+                }
+                toolStats[tc.tool].count++;
+                toolStats[tc.tool].cost += tc.cost || 0;
+                toolStats[tc.tool].tokens += tc.tokens?.total || 0;
+            });
+            const tools = Object.values(toolStats).sort((a, b) => b.cost - a.cost);
+            
             res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
             res.end(JSON.stringify({
                 ...session,
                 breakdown,
                 messageCount: events.filter(e => e.type === 'message').length,
-                eventCount: events.length
+                eventCount: events.length,
+                toolCalls: toolCalls.length,
+                toolStats: tools
             }));
         } catch (error) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
